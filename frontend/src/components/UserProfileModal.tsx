@@ -5,6 +5,8 @@ import { useServerStore } from '../store/serverStore';
 import { useFriendStore } from '../store/friendStore';
 import { useAuthStore } from '../store/authStore';
 import { formatDiscordDate } from '../lib/dateUtils';
+// 👇 IMPORT DU COMPOSANT CONFIRMMODAL
+import ConfirmModal from './ConfirmModal'; 
 
 interface UserProfileModalProps {
   userId: string | null;
@@ -26,7 +28,6 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
   const modalRef = useRef<HTMLDivElement>(null);
   
   const { onlineUsers, addConversation, setActiveConversation, setActiveServer } = useServerStore();
-  // J'ajoute removeRequest ici. Assure-toi qu'il existe dans ton store !
   const { requests, addRequest, updateRequest, removeRequest } = useFriendStore(); 
   const { user: currentUser } = useAuthStore();
 
@@ -34,8 +35,10 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   
-  // Nouvel état pour l'effet de survol du bouton Ami
+  // État pour l'effet de survol du bouton Ami
   const [hoveringFriend, setHoveringFriend] = useState(false);
+  // 👇 NOUVEL ÉTAT POUR GÉRER L'OUVERTURE DE LA MODALE DE CONFIRMATION
+  const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
 
   const isOnline = userId ? onlineUsers.has(userId) : false;
   const isMe = currentUser?.id === userId;
@@ -50,15 +53,19 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     }
   }, [userId]);
 
+  // Gestion du clic en dehors pour fermer le profil (seulement si la confirm n'est pas ouverte)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Si la modale de confirmation est ouverte, on ne ferme pas le profil
+      if (isRemoveModalOpen) return;
+
       if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
         onClose();
       }
     };
     if (userId) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [userId, onClose]);
+  }, [userId, onClose, isRemoveModalOpen]);
 
   const getFriendStatus = () => {
     if (isMe) return 'ME';
@@ -112,15 +119,19 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     finally { setActionLoading(false); }
   };
 
-  // --- NOUVELLE FONCTION : RETIRER UN AMI ---
-  const handleRemoveFriend = async () => {
-    if (!userId) return;
-    // Petite confirmation de sécurité
-    if (!window.confirm(`Voulez-vous vraiment retirer ${profile?.username} de vos amis ?`)) return;
+  // --- ÉTAPE 1 : Clic sur le bouton "Retirer" ---
+  // On ouvre juste la modale de confirmation, plus de window.confirm() horrible.
+  const handleRemoveFriendClick = () => {
+    setIsRemoveModalOpen(true);
+  };
 
-    setActionLoading(true);
+  // --- ÉTAPE 2 : Logique exécutée quand l'utilisateur confirme dans la modale ---
+  const confirmRemoveFriend = async () => {
+    if (!userId) return;
+    // Note: setActionLoading n'est pas nécessaire ici car ConfirmModal gère son propre état de chargement.
+
     try {
-        // Appel API pour supprimer l'ami (ou la requête acceptée)
+        // Appel API pour supprimer l'ami
         await api.delete(`/friends/${userId}`);
         
         // Mise à jour locale du store
@@ -131,17 +142,17 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
         
         if (request && removeRequest) {
             removeRequest(request.id);
-        } else {
-            // Fallback si removeRequest n'existe pas dans le store : on ferme juste le modal
-            // Idéalement, recharge les amis ici
-            onClose(); 
         }
+        
+        // Une fois supprimé, on ferme la modale de profil car l'utilisateur n'est plus ami
+        onClose();
     } catch (error) {
         console.error("Erreur lors de la suppression de l'ami", error);
-        alert("Impossible de retirer cet ami.");
+        // ConfirmModal log déjà l'erreur, mais on pourrait ajouter un toast ici plus tard.
     } finally {
-        setActionLoading(false);
+        // Reset des états locaux
         setHoveringFriend(false);
+        setIsRemoveModalOpen(false);
     }
   };
 
@@ -170,17 +181,17 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
             </button>
         )}
         
-        {/* 👇 LE BOUTON AMIS INTERACTIF ET DYNAMIQUE */}
         {friendStatus === 'FRIEND' && (
              <button 
-                onClick={handleRemoveFriend}
+                // 👇 MODIFICATION ICI : Appel de la nouvelle fonction qui ouvre la modale
+                onClick={handleRemoveFriendClick}
                 disabled={actionLoading}
                 onMouseEnter={() => setHoveringFriend(true)}
                 onMouseLeave={() => setHoveringFriend(false)}
                 className={`px-4 py-1.5 rounded-[3px] font-medium text-sm border border-transparent transition-colors flex items-center gap-2 min-w-[90px] justify-center ${
                     hoveringFriend 
-                    ? 'bg-red-500 text-white' // Style au survol (Rouge / Danger)
-                    : 'bg-[#2B2D31] text-white' // Style normal (Sobre)
+                    ? 'bg-red-500 text-white'
+                    : 'bg-[#2B2D31] text-white'
                 }`}
              >
                 {hoveringFriend ? (
@@ -202,89 +213,107 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
   if (!userId) return null;
 
   return (
-    <div 
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={onClose} 
-    >
-      <div 
-        ref={modalRef}
-        className="bg-[#111214] w-[600px] rounded-xl shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200 flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {loading ? (
-            <div className="h-64 flex items-center justify-center text-slate-500">Chargement...</div>
-        ) : profile ? (
-            <>
-                {/* BANNIÈRE */}
-                <div className="h-[210px] w-full relative bg-[#1E1F22]">
-                    {profile.bannerUrl ? (
-                        <img src={profile.bannerUrl} className="w-full h-full object-cover" alt="Banner" />
-                    ) : (
-                        <div className="w-full h-full bg-[#5865F2]"></div>
-                    )}
-                    <button 
-                        onClick={onClose} 
-                        className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-white/80 hover:text-white rounded-full transition-all z-20"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    </button>
-                </div>
+    <>
+        {/* MODALE PROFIL PRINCIPALE */}
+        <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={onClose} 
+        >
+        <div 
+            ref={modalRef}
+            className="bg-[#111214] w-[600px] rounded-xl shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+        >
+            {loading ? (
+                <div className="h-64 flex items-center justify-center text-slate-500">Chargement...</div>
+            ) : profile ? (
+                <>
+                    {/* BANNIÈRE */}
+                    <div className="h-[210px] w-full relative bg-[#1E1F22]">
+                        {profile.bannerUrl ? (
+                            <img src={profile.bannerUrl} className="w-full h-full object-cover" alt="Banner" />
+                        ) : (
+                            <div className="w-full h-full bg-[#5865F2]"></div>
+                        )}
+                        <button 
+                            onClick={onClose} 
+                            className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-white/80 hover:text-white rounded-full transition-all z-20"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
 
-                {/* AVATAR EN ABSOLU */}
-                <div className="absolute top-[148px] left-[22px] z-20 pointer-events-none">
-                     <div className="relative pointer-events-auto">
-                        <div className="w-[138px] h-[138px] rounded-full p-[7px] bg-[#111214]">
-                            <div className="w-full h-full rounded-full overflow-hidden bg-[#1E1F22] flex items-center justify-center relative border-[6px] border-[#111214]">
-                                {profile.avatarUrl ? (
-                                    <img src={profile.avatarUrl} className="w-full h-full object-cover" alt={profile.username} />
-                                ) : (
-                                    <span className="text-4xl font-bold text-slate-400">{profile.username[0].toUpperCase()}</span>
-                                )}
+                    {/* AVATAR EN ABSOLU */}
+                    <div className="absolute top-[148px] left-[22px] z-20 pointer-events-none">
+                        <div className="relative pointer-events-auto">
+                            <div className="w-[138px] h-[138px] rounded-full p-[7px] bg-[#111214]">
+                                <div className="w-full h-full rounded-full overflow-hidden bg-[#1E1F22] flex items-center justify-center relative border-[6px] border-[#111214]">
+                                    {profile.avatarUrl ? (
+                                        <img src={profile.avatarUrl} className="w-full h-full object-cover" alt={profile.username} />
+                                    ) : (
+                                        <span className="text-4xl font-bold text-slate-400">{profile.username[0].toUpperCase()}</span>
+                                    )}
+                                </div>
                             </div>
+                            <div className={`absolute bottom-4 right-4 w-8 h-8 rounded-full border-[6px] border-[#111214] ${isOnline ? 'bg-green-500' : 'bg-slate-500'}`} title={isOnline ? "En ligne" : "Hors ligne"}></div>
                         </div>
-                        <div className={`absolute bottom-4 right-4 w-8 h-8 rounded-full border-[6px] border-[#111214] ${isOnline ? 'bg-green-500' : 'bg-slate-500'}`} title={isOnline ? "En ligne" : "Hors ligne"}></div>
-                    </div>
-                </div>
-
-                {/* CORPS DU PROFIL */}
-                <div className="px-4 pb-5 relative bg-[#111214]">
-                    <div className="flex justify-end py-4 min-h-[60px]">
-                        {renderButtons()}
                     </div>
 
-                    <div className="bg-[#1E1F22] rounded-lg p-4 border border-[#2B2D31] mt-4 ml-2 mr-2">
-                        <div className="mb-4 border-b border-slate-700/50 pb-4">
-                            <h1 className="text-2xl font-bold text-white flex items-center gap-1">
-                                {profile.username}
-                                <span className="text-slate-400 font-medium text-xl">#{profile.discriminator}</span>
-                            </h1>
+                    {/* CORPS DU PROFIL */}
+                    <div className="px-4 pb-5 relative bg-[#111214]">
+                        <div className="flex justify-end py-4 min-h-[60px]">
+                            {renderButtons()}
                         </div>
 
-                        <div className="mb-4">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">À propos de moi</h3>
-                            <div className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">
-                                {profile.bio || <span className="italic opacity-50">Cet utilisateur n'a pas encore de bio.</span>}
+                        <div className="bg-[#1E1F22] rounded-lg p-4 border border-[#2B2D31] mt-4 ml-2 mr-2">
+                            <div className="mb-4 border-b border-slate-700/50 pb-4">
+                                <h1 className="text-2xl font-bold text-white flex items-center gap-1">
+                                    {profile.username}
+                                    <span className="text-slate-400 font-medium text-xl">#{profile.discriminator}</span>
+                                </h1>
                             </div>
-                        </div>
 
-                        <div className="mb-2">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1">Membre depuis</h3>
-                            <p className="text-slate-400 text-xs">{formatDiscordDate(profile.createdAt)}</p>
-                        </div>
-                        
-                        <div className="mt-4 pt-4 border-t border-slate-700/50">
-                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">Note</h3>
-                             <input 
-                                className="w-full bg-transparent text-xs text-slate-300 placeholder-slate-500 focus:outline-none"
-                                placeholder="Cliquez pour ajouter une note..."
-                             />
-                        </div>
+                            <div className="mb-4">
+                                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">À propos de moi</h3>
+                                <div className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">
+                                    {profile.bio || <span className="italic opacity-50">Cet utilisateur n'a pas encore de bio.</span>}
+                                </div>
+                            </div>
 
+                            <div className="mb-2">
+                                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1">Membre depuis</h3>
+                                <p className="text-slate-400 text-xs">{formatDiscordDate(profile.createdAt)}</p>
+                            </div>
+                            
+                            <div className="mt-4 pt-4 border-t border-slate-700/50">
+                                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">Note</h3>
+                                <input 
+                                    className="w-full bg-transparent text-xs text-slate-300 placeholder-slate-500 focus:outline-none"
+                                    placeholder="Cliquez pour ajouter une note..."
+                                />
+                            </div>
+
+                        </div>
                     </div>
-                </div>
-            </>
-        ) : null}
-      </div>
-    </div>
+                </>
+            ) : null}
+        </div>
+        </div>
+
+        {/* 👇 INTÉGRATION DE LA MODALE DE CONFIRMATION CUSTOM */}
+        <ConfirmModal 
+            isOpen={isRemoveModalOpen}
+            onClose={() => setIsRemoveModalOpen(false)}
+            onConfirm={confirmRemoveFriend}
+            title="Retirer un ami"
+            message={
+                <span>
+                    Êtes-vous sûr de vouloir retirer <strong>{profile?.username}</strong> de votre liste d'amis ?
+                </span>
+            }
+            confirmText="Retirer"
+            isDestructive={true}
+        />
+    </>
   );
 }
