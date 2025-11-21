@@ -8,6 +8,7 @@ export const FriendController = {
       const userId = req.user?.userId;
       let { username, discriminator, usernameString } = req.body;
 
+      // Support du format "Pseudo#1234"
       if (usernameString && !username) {
           const parts = usernameString.split('#');
           if (parts.length === 2) {
@@ -26,6 +27,7 @@ export const FriendController = {
       if (!receiver) return res.status(404).json({ error: "Utilisateur introuvable" });
       if (receiver.id === userId) return res.status(400).json({ error: "Vous ne pouvez pas vous ajouter vous-même" });
 
+      // Vérifier si une relation existe déjà
       const existingRequest = await prisma.friendRequest.findFirst({
         where: {
           OR: [
@@ -39,7 +41,7 @@ export const FriendController = {
         if (existingRequest.status === 'ACCEPTED') return res.status(400).json({ error: "Déjà amis !" });
         if (existingRequest.senderId === userId) return res.status(400).json({ error: "Demande déjà envoyée." });
         
-        // Auto-Accept
+        // Auto-Accept : Si l'autre m'avait déjà envoyé une demande, on accepte automatiquement
         if (existingRequest.senderId === receiver.id) {
            const updatedRequest = await prisma.friendRequest.update({
              where: { id: existingRequest.id },
@@ -53,6 +55,7 @@ export const FriendController = {
         }
       }
 
+      // Création de la demande
       const request = await prisma.friendRequest.create({
         data: { senderId: userId, receiverId: receiver.id, status: 'PENDING' },
         include: { sender: true, receiver: true }
@@ -68,7 +71,7 @@ export const FriendController = {
     }
   },
 
-  // 2. Répondre
+  // 2. Répondre (Accepter / Refuser)
   async respond(req: Request, res: Response) {
     try {
       const userId = req.user?.userId;
@@ -76,6 +79,8 @@ export const FriendController = {
 
       const request = await prisma.friendRequest.findUnique({ where: { id: requestId } });
       if (!request) return res.status(404).json({ error: "Introuvable" });
+      
+      // Seul le destinataire peut répondre
       if (request.receiverId !== userId) return res.status(403).json({ error: "Non autorisé" });
 
       const io = req.app.get('io');
@@ -86,12 +91,21 @@ export const FriendController = {
           data: { status: 'ACCEPTED' },
           include: { sender: true, receiver: true }
         });
+        
+        // Notifier les deux
         io.to(request.senderId).emit('friend_request_accepted', updated);
-        io.to(request.receiverId).emit('friend_request_accepted', updated); // Important pour le self-update
+        io.to(request.receiverId).emit('friend_request_accepted', updated);
+        
         res.json(updated);
       } else {
+        // Refuser = Supprimer la demande
         await prisma.friendRequest.delete({ where: { id: requestId } });
+        
+        // On informe l'expéditeur que c'est refusé/supprimé
         io.to(request.senderId).emit('friend_removed', requestId);
+        // On informe aussi le receveur pour mettre à jour son UI
+        io.to(request.receiverId).emit('friend_removed', requestId);
+        
         res.json({ success: true });
       }
     } catch (error) {
@@ -114,31 +128,47 @@ export const FriendController = {
     }
   },
 
-  // 4. Supprimer (VERSION FINALE)
+  // 4. Supprimer (VERSION INTELLIGENTE)
+  // Gère la suppression par requestId OU par userId (pour le bouton "Retirer ami")
   async delete(req: Request, res: Response) {
     try {
       const userId = req.user?.userId;
-      const { requestId } = req.params;
+      const { id } = req.params; // Peut être requestId OU userId d'un ami
 
-      const request = await prisma.friendRequest.findUnique({ where: { id: requestId } });
+      if (!userId) return res.status(401).json({ error: "Non autorisé" });
+
+      // A. Essayer de trouver par ID de requête (cas classique)
+      let request = await prisma.friendRequest.findUnique({ where: { id } });
+
+      // B. Si pas trouvé, c'est peut-être un UserID (cas du bouton profil "Retirer")
+      // On cherche alors la relation entre MOI (userId) et LUI (id)
+      if (!request) {
+        request = await prisma.friendRequest.findFirst({
+            where: {
+                OR: [
+                    { senderId: userId, receiverId: id },
+                    { senderId: id, receiverId: userId }
+                ]
+            }
+        });
+      }
 
       if (!request) return res.status(404).json({ error: "Relation introuvable" });
 
+      // Vérification de sécurité : est-ce que je suis concerné ?
       if (request.senderId !== userId && request.receiverId !== userId) {
         return res.status(403).json({ error: "Non autorisé" });
       }
 
-      await prisma.friendRequest.delete({ where: { id: requestId } });
+      // Suppression
+      await prisma.friendRequest.delete({ where: { id: request.id } });
 
-      // Notification Socket Temps Réel aux DEUX parties
+      // Notification Socket
       const io = req.app.get('io');
       
-      // On prévient l'autre (qu'il soit sender ou receiver)
-      const otherUserId = request.senderId === userId ? request.receiverId : request.senderId;
-      io.to(otherUserId).emit('friend_removed', requestId);
-      
-      // On prévient aussi l'émetteur (soi-même) pour être sûr que tous les clients (si multi-fenêtres) sont à jour
-      io.to(userId).emit('friend_removed', requestId);
+      // On prévient tout le monde
+      io.to(request.senderId).emit('friend_removed', request.id);
+      io.to(request.receiverId).emit('friend_removed', request.id);
 
       res.json({ success: true });
     } catch (error) {
