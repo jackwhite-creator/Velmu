@@ -61,7 +61,8 @@ export default function MessageContent({
       ) : (
         <div>
           {msg.content && (
-            <p className={`text-slate-300 leading-relaxed whitespace-pre-wrap break-words ${shouldGroup ? '' : '-mt-1'} ${isMentioningMe ? 'text-slate-100' : ''}`}>
+            // 👇 CORRECTION ICI : 'break-all' au lieu de 'break-words' pour forcer le retour à la ligne
+            <p className={`text-slate-300 leading-relaxed whitespace-pre-wrap break-all ${shouldGroup ? '' : '-mt-1'} ${isMentioningMe ? 'text-slate-100' : ''}`}>
               {msg.content}
               {isModified && <span className="text-[10px] text-slate-500 ml-1 select-none" title={`Modifié le ${new Date(msg.updatedAt).toLocaleString()}`}>(modifié)</span>}
             </p>
@@ -73,7 +74,6 @@ export default function MessageContent({
               <img 
                 src={msg.fileUrl} 
                 alt="Attachment" 
-                // 👇 MODIFICATION ICI : cursor-pointer au lieu de cursor-zoom-in
                 className="max-w-full md:max-w-sm max-h-[350px] rounded-lg shadow-sm border border-slate-700/50 cursor-pointer hover:shadow-md transition"
                 onClick={() => onImageClick(msg.fileUrl)}
                 onError={() => console.error("Erreur chargement image", msg.fileUrl)}
