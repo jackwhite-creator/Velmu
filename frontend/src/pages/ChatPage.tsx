@@ -18,7 +18,7 @@ import CreateChannelModal from '../components/CreateChannelModal';
 import InviteModal from '../components/InviteModal';
 import DMSidebar from '../components/chat/DMSidebar';
 import FriendsDashboard from '../components/chat/FriendsDashboard';
-import ConfirmModal from '../components/ConfirmModal'; // <--- Import
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -38,12 +38,15 @@ export default function ChatPage() {
   const [fullProfileId, setFullProfileId] = useState<string | null>(null);
   const [creationCategoryId, setCreationCategoryId] = useState<string | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [showMembers, setShowMembers] = useState(true);
+  const [showMembers, setShowMembers] = useState(false); // Désactivé par défaut sur mobile
   const [memberListVersion, setMemberListVersion] = useState(0);
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [isRestoring, setIsRestoring] = useState(true);
+  
+  // 📱 NOUVEAU: États pour la navigation mobile
+  const [mobileView, setMobileView] = useState<'servers' | 'channels' | 'chat'>('chat');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // --- NOUVEAU STATE POUR LA NOTIF DE KICK ---
   const [kickedServerName, setKickedServerName] = useState<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -52,6 +55,17 @@ export default function ChatPage() {
   const targetId = activeServer ? activeChannel?.id : activeConversation?.id;
   const isDm = !activeServer && !!activeConversation;
   const { messages, loading: isLoadingChat, hasMore, sendMessage, loadMore } = useChat(targetId, isDm);
+
+  // 📱 Détection du resize
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setMobileView('chat'); // Reset sur desktop
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 1. INIT
   useEffect(() => {
@@ -132,18 +146,13 @@ export default function ChatPage() {
 
     const handleMemberKicked = ({ serverId, userId }: { serverId: string, userId: string }) => {
         if (user?.id === userId) {
-            // 1. On récupère le nom AVANT de supprimer pour l'afficher
             const serverName = servers.find(s => s.id === serverId)?.name || "un serveur";
-            
             removeServer(serverId);
-            
             if (activeServer?.id === serverId) {
                 setActiveServer(null);
                 setActiveChannel(null);
                 localStorage.removeItem('lastServerId');
                 navigate('/channels/@me');
-                
-                // 2. On affiche la belle modale au lieu de l'alert moche
                 setKickedServerName(serverName);
             }
         } else {
@@ -178,13 +187,27 @@ export default function ChatPage() {
 
   const handleUserClick = (e: React.MouseEvent, userId: string) => {
     e.preventDefault(); e.stopPropagation();
-    setPopover({ userId, x: e.clientX, y: e.clientY });
+    if (isMobile) {
+      setFullProfileId(userId);
+    } else {
+      setPopover({ userId, x: e.clientX, y: e.clientY });
+    }
   };
 
   const handleMemberClick = (e: React.MouseEvent, userId: string) => {
     e.preventDefault(); e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    setPopover({ userId, x: rect.left - 355, y: rect.top });
+    if (isMobile) {
+      setFullProfileId(userId);
+    } else {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setPopover({ userId, x: rect.left - 355, y: rect.top });
+    }
+  };
+
+  // 📱 Handler pour sélection de channel sur mobile
+  const handleChannelSelect = (channel: any) => {
+    setActiveChannel(channel);
+    if (isMobile) setMobileView('chat');
   };
 
   const chatHeaderInfo = useMemo(() => {
@@ -200,8 +223,134 @@ export default function ChatPage() {
       return null;
   }, [activeServer, activeChannel, activeConversation, user?.id]);
 
-  if (isRestoring) return <div className="flex h-screen w-full bg-slate-900 items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div></div>;
+  if (isRestoring) return (
+    <div className="flex h-screen h-[100dvh] w-full bg-slate-900 items-center justify-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
+    </div>
+  );
 
+  // 📱 RENDU MOBILE
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-screen h-[100dvh] bg-slate-900 text-slate-100 font-sans overflow-hidden">
+        
+        {/* Vue Serveurs */}
+        {mobileView === 'servers' && (
+          <div className="flex-1 flex overflow-hidden">
+            <ServerList onServerClick={() => setMobileView('channels')} />
+            <div className="flex-1 flex flex-col">
+              {activeServer ? (
+                <ServerSidebar 
+                  activeServer={activeServer} 
+                  activeChannel={activeChannel} 
+                  socket={socket} 
+                  onChannelSelect={handleChannelSelect}
+                  onCreateChannel={setCreationCategoryId} 
+                  onInvite={() => setIsInviteOpen(true)} 
+                  onOpenProfile={() => setIsProfileOpen(true)} 
+                />
+              ) : (
+                <DMSidebar 
+                  onOpenProfile={() => setIsProfileOpen(true)} 
+                  onConversationSelect={() => setMobileView('chat')}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Vue Channels */}
+        {mobileView === 'channels' && (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="h-12 bg-slate-800 border-b border-slate-700 flex items-center px-4">
+              <button onClick={() => setMobileView('servers')} className="p-2 -ml-2 text-slate-400 hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <span className="font-bold text-white ml-2">{activeServer?.name || 'Messages'}</span>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {activeServer ? (
+                <ServerSidebar 
+                  activeServer={activeServer} 
+                  activeChannel={activeChannel} 
+                  socket={socket} 
+                  onChannelSelect={handleChannelSelect}
+                  onCreateChannel={setCreationCategoryId} 
+                  onInvite={() => setIsInviteOpen(true)} 
+                  onOpenProfile={() => setIsProfileOpen(true)}
+                  isMobile={true}
+                />
+              ) : (
+                <DMSidebar 
+                  onOpenProfile={() => setIsProfileOpen(true)} 
+                  onConversationSelect={() => setMobileView('chat')}
+                  isMobile={true}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Vue Chat */}
+        {mobileView === 'chat' && (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Header mobile avec bouton retour */}
+            <div className="h-12 bg-slate-800 border-b border-slate-700 flex items-center px-3 flex-shrink-0">
+              <button onClick={() => setMobileView('servers')} className="p-2 -ml-1 text-slate-400 hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </button>
+              <span className="font-bold text-white ml-3 truncate">
+                {chatHeaderInfo?.name ? `# ${chatHeaderInfo.name}` : 'Velmu'}
+              </span>
+            </div>
+            
+            {!activeServer && !activeConversation ? (
+              <FriendsDashboard isMobile={true} />
+            ) : (
+              <ChatArea 
+                messages={messages} 
+                isLoadingMore={isLoadingChat} 
+                hasMore={hasMore} 
+                onScroll={loadMore} 
+                activeChannel={chatHeaderInfo} 
+                inputValue={inputValue} 
+                setInputValue={setInputValue} 
+                onSendMessage={handleSendMessage} 
+                showMembers={false}
+                onUserClick={handleUserClick} 
+                onToggleMembers={() => {}}
+                scrollRef={scrollContainerRef} 
+                messagesEndRef={messagesEndRef} 
+                socket={socket} 
+                replyingTo={replyingTo} 
+                setReplyingTo={setReplyingTo}
+                isMobile={true}
+                hideHeader={true}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Modales */}
+        <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+        <UserProfileModal userId={fullProfileId} onClose={() => setFullProfileId(null)} />
+        <CreateChannelModal isOpen={!!creationCategoryId} categoryId={creationCategoryId} onClose={() => setCreationCategoryId(null)} onSuccess={() => {}} />
+        <InviteModal isOpen={isInviteOpen} server={activeServer} onClose={() => setIsInviteOpen(false)} />
+        <ConfirmModal 
+          isOpen={!!kickedServerName}
+          onClose={() => setKickedServerName(null)}
+          onConfirm={() => setKickedServerName(null)}
+          title="Exclu du serveur"
+          message={`Vous avez été exclu du serveur "${kickedServerName}".`}
+          isDestructive={false}
+          confirmText="Compris"
+          showCancel={false}
+        />
+      </div>
+    );
+  }
+
+  // 🖥️ RENDU DESKTOP (inchangé)
   return (
     <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
       <ServerList />
@@ -221,17 +370,15 @@ export default function ChatPage() {
       <UserProfileModal userId={fullProfileId} onClose={() => setFullProfileId(null)} />
       <CreateChannelModal isOpen={!!creationCategoryId} categoryId={creationCategoryId} onClose={() => setCreationCategoryId(null)} onSuccess={() => {}} />
       <InviteModal isOpen={isInviteOpen} server={activeServer} onClose={() => setIsInviteOpen(false)} />
-      
-      {/* 👇 MODALE D'INFO QUAND ON EST KICKÉ 👇 */}
       <ConfirmModal 
         isOpen={!!kickedServerName}
         onClose={() => setKickedServerName(null)}
-        onConfirm={() => setKickedServerName(null)} // Juste fermer
+        onConfirm={() => setKickedServerName(null)}
         title="Exclu du serveur"
         message={`Vous avez été exclu du serveur "${kickedServerName}".`}
         isDestructive={false}
         confirmText="Compris"
-        showCancel={false} // Pas de bouton Annuler
+        showCancel={false}
       />
     </div>
   );

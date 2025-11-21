@@ -32,7 +32,7 @@ export default function FriendsDashboard() {
     try {
       const res = await api.post('/friends/request', { usernameString: addUsername });
       addRequest(res.data); 
-      setAddStatus({ type: 'success', msg: `Demande envoyée à ${addUsername} !` });
+      setAddStatus({ type: 'success', msg: `Demande envoyÃ©e Ã  ${addUsername} !` });
       setAddUsername('');
     } catch (err: any) {
       setAddStatus({ type: 'error', msg: err.response?.data?.error || "Erreur" });
@@ -55,7 +55,7 @@ export default function FriendsDashboard() {
       await api.delete(`/friends/${requestId}`);
     } catch (e) { 
       console.error("Erreur suppression demande", e);
-      // Idéalement on remettrait la demande si ça échoue, mais c'est rare
+      // IdÃ©alement on remettrait la demande si Ã§a Ã©choue, mais c'est rare
     }
   };
 
@@ -125,7 +125,7 @@ export default function FriendsDashboard() {
             {activeTab === 'add' ? (
                <div className="max-w-xl">
                   <h2 className="text-white font-bold text-xl mb-2">Ajouter un ami</h2>
-                  <p className="text-slate-400 text-sm mb-6">Tu peux ajouter des amis grâce à leur pseudo Velmu (ex: Pseudo#0000).</p>
+                  <p className="text-slate-400 text-sm mb-6">Tu peux ajouter des amis grÃ¢ce Ã  leur pseudo Velmu (ex: Pseudo#0000).</p>
                   
                   <form onSubmit={handleAddFriend} className="relative group">
                      <div className={`absolute inset-0 rounded-lg opacity-20 transition ${addStatus?.type === 'success' ? 'bg-green-500' : addStatus?.type === 'error' ? 'bg-red-500' : 'bg-indigo-500 group-focus-within:opacity-40'}`}></div>
@@ -144,9 +144,9 @@ export default function FriendsDashboard() {
             ) : (
                <div className="space-y-2">
                   <div className="text-xs font-bold text-slate-500 uppercase mb-4 pb-2 border-b border-slate-800 tracking-wider">
-                     {activeTab === 'online' ? `En ligne — ${displayedList().length}` : 
-                      activeTab === 'all' ? `Tous les amis — ${displayedList().length}` : 
-                      `En attente — ${displayedList().length}`}
+                     {activeTab === 'online' ? `En ligne â€” ${displayedList().length}` : 
+                      activeTab === 'all' ? `Tous les amis â€” ${displayedList().length}` : 
+                      `En attente â€” ${displayedList().length}`}
                   </div>
 
                   {displayedList().length === 0 ? (
@@ -154,7 +154,7 @@ export default function FriendsDashboard() {
                         <div className="w-32 h-32 bg-slate-800 rounded-full flex items-center justify-center mb-4">
                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
                         </div>
-                        <p className="text-slate-400 text-sm">Aucun ami à afficher pour le moment.</p>
+                        <p className="text-slate-400 text-sm">Aucun ami Ã  afficher pour le moment.</p>
                      </div>
                   ) : (
                      displayedList().map(req => {
@@ -183,7 +183,7 @@ export default function FriendsDashboard() {
                                     </div>
                                     <div className="text-xs text-slate-400 font-medium">
                                        {req.status === 'PENDING' 
-                                          ? (isIncoming ? "Demande reçue" : "Demande envoyée") 
+                                          ? (isIncoming ? "Demande reÃ§ue" : "Demande envoyÃ©e") 
                                           : (isOnline ? "En ligne" : "Hors ligne")}
                                     </div>
                                  </div>
@@ -223,7 +223,7 @@ export default function FriendsDashboard() {
             <h3 className="text-lg font-bold text-white mb-4">En ligne maintenant</h3>
             <div className="flex-1 flex flex-col items-center justify-center text-center opacity-50">
                <div className="w-full p-6 rounded-lg border-2 border-dashed border-slate-700 mb-4">
-                  <p className="text-sm text-slate-400">C'est très calme par ici...</p>
+                  <p className="text-sm text-slate-400">C'est trÃ¨s calme par ici...</p>
                </div>
             </div>
          </div>
@@ -237,7 +237,7 @@ export default function FriendsDashboard() {
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleDeleteFriend}
         title={`Retirer ${friendToDelete?.name}`}
-        message={`Êtes-vous sûr de vouloir retirer ${friendToDelete?.name} de vos amis ?`}
+        message={`ÃŠtes-vous sÃ»r de vouloir retirer ${friendToDelete?.name} de vos amis ?`}
         isDestructive={true}
         confirmText="Retirer"
       />
