@@ -142,15 +142,15 @@ export default function ChatArea({
          >
             {isLoadingMore && <div className="text-center py-2 text-xs text-slate-500">Chargement...</div>}
             
-            {!hasMore && !isLoadingMore && messages.length > 0 && (
+
                 <div className="mt-8 mb-8 px-4">
                     <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
                         <span className="text-3xl text-slate-200">#</span>
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">Bienvenue dans {activeChannel.name} !</h1>
+                    <h1 className="text-3xl font-bold text-white mb-2">Bienvenue dans #{activeChannel.name} !</h1>
                     <p className="text-slate-400">C'est le début de l'histoire de ce salon.</p>
                 </div>
-            )}
+
 
             {messages.map((msg, index) => {
                if (!msg || !msg.user) return null;
