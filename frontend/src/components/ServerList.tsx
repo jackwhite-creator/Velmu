@@ -9,16 +9,20 @@ export default function ServerList() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
 
-  // --- ETAT POUR LE TOOLTIP FLOTTANT ---
-  // On stocke le texte à afficher et la position Y (hauteur)
   const [tooltip, setTooltip] = useState<{ text: string; top: number } | null>(null);
 
+  const hideTooltip = () => {
+    setTooltip(null);
+  };
+
   const goToHome = () => {
+    hideTooltip(); // <--- Disparition immédiate au clic
     setActiveServer(null);
     setActiveConversation(null);
   };
 
   const handleServerClick = async (server: any) => {
+      hideTooltip(); // <--- Disparition immédiate au clic
       if (activeServer?.id === server.id) return;
       setActiveServer(server);
       setActiveConversation(null);
@@ -30,16 +34,11 @@ export default function ServerList() {
       }
   };
 
-  // Fonction pour afficher le tooltip au bon endroit
   const showTooltip = (e: React.MouseEvent, text: string) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    // On centre le tooltip par rapport à l'élément survolé
+    // On centre le tooltip par rapport à l'élément
     const top = rect.top + rect.height / 2; 
     setTooltip({ text, top });
-  };
-
-  const hideTooltip = () => {
-    setTooltip(null);
   };
 
   return (
@@ -94,7 +93,7 @@ export default function ServerList() {
         onMouseLeave={hideTooltip}
       >
         <div 
-          onClick={() => setIsCreateOpen(true)}
+          onClick={() => { hideTooltip(); setIsCreateOpen(true); }}
           className="w-12 h-12 rounded-[24px] bg-slate-700 group-hover:bg-green-600 group-hover:rounded-[16px] transition-all duration-200 cursor-pointer flex items-center justify-center text-green-500 group-hover:text-white"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -108,23 +107,31 @@ export default function ServerList() {
         onMouseLeave={hideTooltip}
       >
         <div 
-          onClick={() => setIsJoinOpen(true)}
+          onClick={() => { hideTooltip(); setIsJoinOpen(true); }}
           className="w-12 h-12 rounded-[24px] bg-slate-700 group-hover:bg-green-600 group-hover:rounded-[16px] transition-all duration-200 cursor-pointer flex items-center justify-center text-green-500 group-hover:text-white"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
         </div>
       </div>
 
-      {/* --- LE TOOLTIP FLOTTANT (FIXED) --- */}
-      {/* Il est en 'fixed', donc il sort du contexte de scroll et s'affiche par-dessus tout */}
+      {/* --- NOUVEAU TOOLTIP FLOTTANT DESIGN --- */}
       {tooltip && (
         <div 
-            className="fixed left-[84px] z-[9999] px-3 py-2 bg-black text-white text-sm font-bold rounded shadow-xl pointer-events-none animate-in fade-in zoom-in-95 duration-100 origin-left"
+            className="
+              fixed left-[84px] z-[9999] 
+              px-4 py-2 
+              bg-white text-slate-900 
+              text-base font-bold 
+              rounded-lg shadow-2xl shadow-black/50
+              pointer-events-none 
+              animate-in fade-in slide-in-from-left-2 zoom-in-95 duration-200 ease-out
+              origin-left
+            "
             style={{ top: tooltip.top, transform: 'translateY(-50%)' }}
         >
             {tooltip.text}
-            {/* Petite flèche */}
-            <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-black"></div>
+            {/* Petite flèche blanche */}
+            <div className="absolute right-full top-1/2 -translate-y-1/2 border-[6px] border-transparent border-r-white"></div>
         </div>
       )}
 
