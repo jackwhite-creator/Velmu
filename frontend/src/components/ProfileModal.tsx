@@ -8,7 +8,7 @@ interface ProfileModalProps {
 }
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  const { user, setUser, token } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   
   const [username, setUsername] = useState('');
   // 👇 FIX TYPAGE : On force le type string | null pour accepter le undefined potentiel converti
