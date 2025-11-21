@@ -43,7 +43,7 @@ interface Props {
 }
 
 export default function ChatArea({
-  activeChannel, messages, isLoadingMore, hasMore, inputValue, showMembers, socket, replyingTo,
+  activeChannel, messages, isLoadingMore, inputValue, showMembers, socket, replyingTo,
   setInputValue, setReplyingTo, onSendMessage: originalSendMessage, onScroll, onUserClick, onToggleMembers,
   scrollRef, messagesEndRef
 }: Props) {
