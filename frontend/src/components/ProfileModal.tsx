@@ -8,7 +8,6 @@ interface ProfileModalProps {
 }
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  // 👇 CORRECTION : On retire 'token' qui ne sert pas
   const { user, setUser } = useAuthStore();
   
   const [username, setUsername] = useState('');
@@ -26,6 +25,17 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       setSelectedFile(null);
     }
   }, [isOpen, user]);
+
+  // Fermeture au clic en dehors
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, onClose]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -45,10 +55,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         formData.append('avatar', selectedFile);
       }
 
-      // 👇 CORRECTION : Plus besoin de headers manuels, l'intercepteur api.ts gère le token
-      // et Axios gère le Content-Type multipart automatiquement
       const res = await api.put('/users/profile', formData);
-
       setUser(res.data);
       onClose();
     } catch (error) {
