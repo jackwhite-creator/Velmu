@@ -8,10 +8,10 @@ interface ProfileModalProps {
 }
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
+  // 👇 CORRECTION : On retire 'token' qui ne sert pas
   const { user, setUser } = useAuthStore();
   
   const [username, setUsername] = useState('');
-  // 👇 FIX TYPAGE : On force le type string | null pour accepter le undefined potentiel converti
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,14 +22,10 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   useEffect(() => {
     if (isOpen && user) {
       setUsername(user.username);
-      // Si user.avatarUrl est undefined, on met null
       setAvatarUrl(user.avatarUrl || null);
       setSelectedFile(null);
     }
   }, [isOpen, user]);
-
-  // ... (Le reste du fichier reste identique à la version "Design" précédente, le rendu était bon) ...
-  // Je remets juste les handlers pour que ce soit complet
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -49,9 +45,9 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         formData.append('avatar', selectedFile);
       }
 
-      const res = await api.put('/users/profile', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      // 👇 CORRECTION : Plus besoin de headers manuels, l'intercepteur api.ts gère le token
+      // et Axios gère le Content-Type multipart automatiquement
+      const res = await api.put('/users/profile', formData);
 
       setUser(res.data);
       onClose();
@@ -67,6 +63,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div ref={modalRef} className="bg-[#313338] w-full max-w-md rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative">
+        
         {/* Bannière */}
         <div className="h-32 bg-gradient-to-r from-indigo-500 to-pink-500 relative">
             <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/30 hover:bg-black/50 text-white/80 hover:text-white rounded-full transition-all">
@@ -79,7 +76,11 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             <div className="relative -mt-[60px] mb-4 w-fit">
                 <div onClick={() => fileInputRef.current?.click()} className="relative w-32 h-32 rounded-full p-1.5 bg-[#313338] group cursor-pointer">
                     <div className="w-full h-full rounded-full overflow-hidden relative bg-[#1E1F22] flex items-center justify-center">
-                        {avatarUrl ? <img src={avatarUrl} alt={username} className="w-full h-full object-cover" /> : <span className="text-4xl font-bold text-slate-400">{username[0]?.toUpperCase()}</span>}
+                        {avatarUrl ? (
+                            <img src={avatarUrl} alt={username} className="w-full h-full object-cover" /> 
+                        ) : (
+                            <span className="text-4xl font-bold text-slate-400">{username[0]?.toUpperCase()}</span>
+                        )}
                         <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 text-white font-medium text-xs uppercase tracking-wide">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-1"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                             Changer
@@ -95,7 +96,14 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             <div className="space-y-5 bg-[#2B2D31] p-4 rounded-lg">
                <div>
                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">Nom d'utilisateur</label>
-                 <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#1E1F22] text-slate-200 p-2.5 rounded-[3px] outline-none border-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium" required minLength={3} />
+                 <input 
+                    type="text" 
+                    value={username} 
+                    onChange={(e) => setUsername(e.target.value)} 
+                    className="w-full bg-[#1E1F22] text-slate-200 p-2.5 rounded-[3px] outline-none border-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium" 
+                    required 
+                    minLength={3} 
+                 />
                </div>
             </div>
 
