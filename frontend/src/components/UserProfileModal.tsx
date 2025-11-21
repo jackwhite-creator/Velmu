@@ -112,28 +112,30 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     if (isMe) return null;
 
     return (
-      <div className="flex gap-3 mt-4 justify-end">
-        <button onClick={handleStartDM} disabled={actionLoading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium text-sm transition shadow-sm">
+      <div className="flex gap-3 justify-end items-center h-[40px]">
+        <button onClick={handleStartDM} disabled={actionLoading} className="px-4 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-[3px] font-medium text-sm transition shadow-sm">
             Envoyer un message
         </button>
 
         {friendStatus === 'NONE' && (
-            <button onClick={handleSendRequest} disabled={actionLoading} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium text-sm transition shadow-sm">
+            <button onClick={handleSendRequest} disabled={actionLoading} className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-[3px] font-medium text-sm transition shadow-sm">
                {actionLoading ? '...' : 'Ajouter en ami'}
             </button>
         )}
         {friendStatus === 'SENT' && (
-            <button disabled className="px-4 py-2 bg-slate-700 text-slate-400 rounded font-medium text-sm cursor-not-allowed border border-slate-600">
+            <button disabled className="px-4 py-1.5 bg-slate-700 text-slate-400 rounded-[3px] font-medium text-sm cursor-not-allowed border border-transparent opacity-80">
                Demande envoyée
             </button>
         )}
         {friendStatus === 'RECEIVED' && (
-            <button onClick={handleAcceptRequest} disabled={actionLoading} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium text-sm transition shadow-sm">
-               Accepter la demande
+            <button onClick={handleAcceptRequest} disabled={actionLoading} className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-[3px] font-medium text-sm transition shadow-sm">
+               Accepter
             </button>
         )}
+        {/* 👇 LE BOUTON AMIS MODIFIÉ EST ICI */}
         {friendStatus === 'FRIEND' && (
-             <button disabled className="px-4 py-2 bg-slate-700 text-green-400 rounded font-medium text-sm border border-slate-600 cursor-default">
+             <button disabled className="px-4 py-1.5 bg-[#2B2D31] text-white rounded-[3px] font-medium text-sm border border-transparent opacity-100 cursor-default flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><polyline points="20 6 9 17 4 12"></polyline></svg>
                 Amis
              </button>
         )}
@@ -144,10 +146,13 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
   if (!userId) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div 
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={onClose} // Ferme au clic dehors
+    >
       <div 
         ref={modalRef}
-        className="bg-[#111214] w-[600px] rounded-lg shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200"
+        className="bg-[#111214] w-[600px] rounded-xl shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {loading ? (
@@ -155,47 +160,54 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
         ) : profile ? (
             <>
                 {/* BANNIÈRE */}
-                <div className="h-[210px] w-full relative" style={{ backgroundColor: profile.bannerUrl ? 'transparent' : '#1E1F22' }}>
+                <div className="h-[210px] w-full relative bg-[#1E1F22]">
                     {profile.bannerUrl ? (
                         <img src={profile.bannerUrl} className="w-full h-full object-cover" alt="Banner" />
                     ) : (
                         <div className="w-full h-full bg-[#5865F2]"></div>
                     )}
-                    <button onClick={onClose} className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white rounded-full p-2 transition">
+                    {/* Bouton fermer (croix) */}
+                    <button 
+                        onClick={onClose} 
+                        className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-white/80 hover:text-white rounded-full transition-all z-20"
+                    >
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
                 </div>
 
-                {/* CORPS DU PROFIL */}
-                <div className="px-5 pb-5 relative bg-[#111214]">
-                    
-                    {/* AVATAR (Chevauchement Ajusté) */}
-                    <div className="flex justify-between items-end -mt-[85px] mb-4">
-                        <div className="relative">
-                            {/* Cercle extérieur (Bordure noire) */}
-                            <div className="w-[132px] h-[132px] rounded-full p-[6px] bg-[#111214]">
-                                {/* Cercle intérieur (Image) */}
-                                <div className="w-full h-full rounded-full overflow-hidden bg-[#2B2D31] flex items-center justify-center relative border-[6px] border-[#111214]">
-                                    {profile.avatarUrl ? (
-                                        <img src={profile.avatarUrl} className="w-full h-full object-cover" alt={profile.username} />
-                                    ) : (
-                                        <span className="text-4xl font-bold text-slate-400">{profile.username[0].toUpperCase()}</span>
-                                    )}
-                                </div>
+                {/* 👇 AVATAR EN ABSOLU (Position exacte) */}
+                <div className="absolute top-[148px] left-[22px] z-20 pointer-events-none">
+                     <div className="relative pointer-events-auto">
+                        {/* Cercle extérieur (Bordure du fond) */}
+                        <div className="w-[138px] h-[138px] rounded-full p-[7px] bg-[#111214]">
+                            {/* Cercle image */}
+                            <div className="w-full h-full rounded-full overflow-hidden bg-[#1E1F22] flex items-center justify-center relative border-[6px] border-[#111214]">
+                                {profile.avatarUrl ? (
+                                    <img src={profile.avatarUrl} className="w-full h-full object-cover" alt={profile.username} />
+                                ) : (
+                                    <span className="text-4xl font-bold text-slate-400">{profile.username[0].toUpperCase()}</span>
+                                )}
                             </div>
-                            {/* Statut */}
-                            <div className={`absolute bottom-4 right-4 w-7 h-7 rounded-full border-[5px] border-[#111214] ${isOnline ? 'bg-green-500' : 'bg-slate-500'}`} title={isOnline ? "En ligne" : "Hors ligne"}></div>
                         </div>
+                        
+                        {/* Statut Dot */}
+                        <div className={`absolute bottom-4 right-4 w-8 h-8 rounded-full border-[6px] border-[#111214] ${isOnline ? 'bg-green-500' : 'bg-slate-500'}`} title={isOnline ? "En ligne" : "Hors ligne"}></div>
+                    </div>
+                </div>
 
-                        {/* BOUTONS D'ACTION */}
+                {/* CORPS DU PROFIL */}
+                <div className="px-4 pb-5 relative bg-[#111214]">
+                    
+                    {/* Header avec les boutons (Aligné à droite) */}
+                    <div className="flex justify-end py-4 min-h-[60px]">
                         {renderButtons()}
                     </div>
 
-                    {/* INFO UTILISATEUR */}
-                    <div className="bg-[#1E1F22] rounded-lg p-4 border border-[#2B2D31]">
+                    {/* INFO CARD */}
+                    <div className="bg-[#1E1F22] rounded-lg p-4 border border-[#2B2D31] mt-4 ml-2 mr-2">
                         
                         {/* Nom + Tag */}
-                        <div className="mb-4 border-b border-slate-700 pb-4">
+                        <div className="mb-4 border-b border-slate-700/50 pb-4">
                             <h1 className="text-2xl font-bold text-white flex items-center gap-1">
                                 {profile.username}
                                 <span className="text-slate-400 font-medium text-xl">#{profile.discriminator}</span>
@@ -217,7 +229,7 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                         </div>
                         
                         {/* NOTE (Optionnel) */}
-                        <div className="mt-4 pt-4 border-t border-slate-700">
+                        <div className="mt-4 pt-4 border-t border-slate-700/50">
                              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">Note</h3>
                              <input 
                                 className="w-full bg-transparent text-xs text-slate-300 placeholder-slate-500 focus:outline-none"
