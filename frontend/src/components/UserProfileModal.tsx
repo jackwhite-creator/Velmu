@@ -26,12 +26,16 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
   const modalRef = useRef<HTMLDivElement>(null);
   
   const { onlineUsers, addConversation, setActiveConversation, setActiveServer } = useServerStore();
-  const { requests, addRequest, updateRequest } = useFriendStore();
+  // J'ajoute removeRequest ici. Assure-toi qu'il existe dans ton store !
+  const { requests, addRequest, updateRequest, removeRequest } = useFriendStore(); 
   const { user: currentUser } = useAuthStore();
 
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  
+  // Nouvel état pour l'effet de survol du bouton Ami
+  const [hoveringFriend, setHoveringFriend] = useState(false);
 
   const isOnline = userId ? onlineUsers.has(userId) : false;
   const isMe = currentUser?.id === userId;
@@ -108,6 +112,39 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     finally { setActionLoading(false); }
   };
 
+  // --- NOUVELLE FONCTION : RETIRER UN AMI ---
+  const handleRemoveFriend = async () => {
+    if (!userId) return;
+    // Petite confirmation de sécurité
+    if (!window.confirm(`Voulez-vous vraiment retirer ${profile?.username} de vos amis ?`)) return;
+
+    setActionLoading(true);
+    try {
+        // Appel API pour supprimer l'ami (ou la requête acceptée)
+        await api.delete(`/friends/${userId}`);
+        
+        // Mise à jour locale du store
+        const request = requests.find(
+            r => (r.senderId === currentUser?.id && r.receiverId === userId) || 
+                 (r.senderId === userId && r.receiverId === currentUser?.id)
+        );
+        
+        if (request && removeRequest) {
+            removeRequest(request.id);
+        } else {
+            // Fallback si removeRequest n'existe pas dans le store : on ferme juste le modal
+            // Idéalement, recharge les amis ici
+            onClose(); 
+        }
+    } catch (error) {
+        console.error("Erreur lors de la suppression de l'ami", error);
+        alert("Impossible de retirer cet ami.");
+    } finally {
+        setActionLoading(false);
+        setHoveringFriend(false);
+    }
+  };
+
   const renderButtons = () => {
     if (isMe) return null;
 
@@ -132,11 +169,30 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                Accepter
             </button>
         )}
-        {/* 👇 LE BOUTON AMIS MODIFIÉ EST ICI */}
+        
+        {/* 👇 LE BOUTON AMIS INTERACTIF ET DYNAMIQUE */}
         {friendStatus === 'FRIEND' && (
-             <button disabled className="px-4 py-1.5 bg-[#2B2D31] text-white rounded-[3px] font-medium text-sm border border-transparent opacity-100 cursor-default flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                Amis
+             <button 
+                onClick={handleRemoveFriend}
+                disabled={actionLoading}
+                onMouseEnter={() => setHoveringFriend(true)}
+                onMouseLeave={() => setHoveringFriend(false)}
+                className={`px-4 py-1.5 rounded-[3px] font-medium text-sm border border-transparent transition-colors flex items-center gap-2 min-w-[90px] justify-center ${
+                    hoveringFriend 
+                    ? 'bg-red-500 text-white' // Style au survol (Rouge / Danger)
+                    : 'bg-[#2B2D31] text-white' // Style normal (Sobre)
+                }`}
+             >
+                {hoveringFriend ? (
+                    <>
+                        <span className="text-xs">Retirer</span>
+                    </>
+                ) : (
+                    <>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        <span>Amis</span>
+                    </>
+                )}
              </button>
         )}
       </div>
@@ -148,7 +204,7 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
   return (
     <div 
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={onClose} // Ferme au clic dehors
+        onClick={onClose} 
     >
       <div 
         ref={modalRef}
@@ -166,7 +222,6 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                     ) : (
                         <div className="w-full h-full bg-[#5865F2]"></div>
                     )}
-                    {/* Bouton fermer (croix) */}
                     <button 
                         onClick={onClose} 
                         className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-white/80 hover:text-white rounded-full transition-all z-20"
@@ -175,12 +230,10 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                     </button>
                 </div>
 
-                {/* 👇 AVATAR EN ABSOLU (Position exacte) */}
+                {/* AVATAR EN ABSOLU */}
                 <div className="absolute top-[148px] left-[22px] z-20 pointer-events-none">
                      <div className="relative pointer-events-auto">
-                        {/* Cercle extérieur (Bordure du fond) */}
                         <div className="w-[138px] h-[138px] rounded-full p-[7px] bg-[#111214]">
-                            {/* Cercle image */}
                             <div className="w-full h-full rounded-full overflow-hidden bg-[#1E1F22] flex items-center justify-center relative border-[6px] border-[#111214]">
                                 {profile.avatarUrl ? (
                                     <img src={profile.avatarUrl} className="w-full h-full object-cover" alt={profile.username} />
@@ -189,24 +242,17 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                                 )}
                             </div>
                         </div>
-                        
-                        {/* Statut Dot */}
                         <div className={`absolute bottom-4 right-4 w-8 h-8 rounded-full border-[6px] border-[#111214] ${isOnline ? 'bg-green-500' : 'bg-slate-500'}`} title={isOnline ? "En ligne" : "Hors ligne"}></div>
                     </div>
                 </div>
 
                 {/* CORPS DU PROFIL */}
                 <div className="px-4 pb-5 relative bg-[#111214]">
-                    
-                    {/* Header avec les boutons (Aligné à droite) */}
                     <div className="flex justify-end py-4 min-h-[60px]">
                         {renderButtons()}
                     </div>
 
-                    {/* INFO CARD */}
                     <div className="bg-[#1E1F22] rounded-lg p-4 border border-[#2B2D31] mt-4 ml-2 mr-2">
-                        
-                        {/* Nom + Tag */}
                         <div className="mb-4 border-b border-slate-700/50 pb-4">
                             <h1 className="text-2xl font-bold text-white flex items-center gap-1">
                                 {profile.username}
@@ -214,7 +260,6 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                             </h1>
                         </div>
 
-                        {/* A PROPOS */}
                         <div className="mb-4">
                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">À propos de moi</h3>
                             <div className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">
@@ -222,13 +267,11 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                             </div>
                         </div>
 
-                        {/* DATE D'ARRIVÉE */}
                         <div className="mb-2">
                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1">Membre depuis</h3>
                             <p className="text-slate-400 text-xs">{formatDiscordDate(profile.createdAt)}</p>
                         </div>
                         
-                        {/* NOTE (Optionnel) */}
                         <div className="mt-4 pt-4 border-t border-slate-700/50">
                              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">Note</h3>
                              <input 
