@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; // <--- Pour la redirection
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useServerStore } from '../store/serverStore';
 import { useFriendStore } from '../store/friendStore';
@@ -32,11 +32,11 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'info' | 'mutual_friends' | 'mutual_servers'>('info');
 
   const isOnline = userId ? onlineUsers.has(userId) : false;
   const isMe = currentUser?.id === userId;
 
-  // Chargement des données
   useEffect(() => {
     if (userId) {
       setLoading(true);
@@ -47,7 +47,6 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     }
   }, [userId]);
 
-  // Fermeture au clic en dehors
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
@@ -58,7 +57,6 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [userId, onClose]);
 
-  // --- LOGIQUE D'ÉTAT D'AMI ---
   const getFriendStatus = () => {
     if (isMe) return 'ME';
     const request = requests.find(
@@ -73,29 +71,18 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
   
   const friendStatus = getFriendStatus();
 
-  // --- ACTIONS ---
-
   const handleStartDM = async () => {
     if (!userId) return;
     setActionLoading(true);
     try {
-      // 1. Créer ou récupérer la conversation
       const res = await api.post('/conversations', { targetUserId: userId });
-      const conversation = res.data;
-
-      // 2. Mettre à jour le store
-      addConversation(conversation);
-      setActiveServer(null); // On quitte le serveur visuellement
-      setActiveConversation(conversation);
-
-      // 3. Redirection et Fermeture
+      addConversation(res.data);
+      setActiveServer(null);
+      setActiveConversation(res.data);
       onClose();
       navigate('/channels/@me'); 
-    } catch (error) {
-      console.error("Erreur ouverture DM", error);
-    } finally {
-      setActionLoading(false);
-    }
+    } catch (error) { console.error("Erreur DM", error); } 
+    finally { setActionLoading(false); }
   };
 
   const handleSendRequest = async () => {
@@ -122,17 +109,12 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     finally { setActionLoading(false); }
   };
 
-  // --- RENDU DES BOUTONS ---
   const renderButtons = () => {
     if (isMe) return null;
 
     return (
       <div className="flex gap-3 mt-4 justify-end">
-        <button 
-            onClick={handleStartDM}
-            disabled={actionLoading}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium text-sm transition shadow-sm"
-        >
+        <button onClick={handleStartDM} disabled={actionLoading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium text-sm transition shadow-sm">
             Envoyer un message
         </button>
 
@@ -178,10 +160,8 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                     {profile.bannerUrl ? (
                         <img src={profile.bannerUrl} className="w-full h-full object-cover" alt="Banner" />
                     ) : (
-                        // Couleur par défaut si pas de bannière (Gris foncé Discord ou couleur unie)
                         <div className="w-full h-full bg-[#5865F2]"></div>
                     )}
-                    {/* Bouton fermer discret */}
                     <button onClick={onClose} className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white rounded-full p-2 transition">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
@@ -190,11 +170,13 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
                 {/* CORPS DU PROFIL */}
                 <div className="px-5 pb-5 relative bg-[#111214]">
                     
-                    {/* AVATAR (Chevauchement) */}
-                    <div className="flex justify-between items-end -mt-[70px] mb-4">
+                    {/* AVATAR (Chevauchement Ajusté) */}
+                    <div className="flex justify-between items-end -mt-[85px] mb-4">
                         <div className="relative">
-                            <div className="w-[130px] h-[130px] rounded-full p-[6px] bg-[#111214]">
-                                <div className="w-full h-full rounded-full overflow-hidden bg-[#2B2D31] flex items-center justify-center relative">
+                            {/* Cercle extérieur (Bordure noire) */}
+                            <div className="w-[132px] h-[132px] rounded-full p-[6px] bg-[#111214]">
+                                {/* Cercle intérieur (Image) */}
+                                <div className="w-full h-full rounded-full overflow-hidden bg-[#2B2D31] flex items-center justify-center relative border-[6px] border-[#111214]">
                                     {profile.avatarUrl ? (
                                         <img src={profile.avatarUrl} className="w-full h-full object-cover" alt={profile.username} />
                                     ) : (
