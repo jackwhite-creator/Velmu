@@ -2,8 +2,9 @@ import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import dotenv from 'dotenv';
 
-// 👇 FIX : On utilise 'require' pour contourner le bug de compilation en prod
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+// 👇 LA CORRECTION EST ICI : On utilise l'import normal + on ignore l'erreur TypeScript
+// @ts-ignore
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
 
 dotenv.config();
 
