@@ -64,7 +64,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       if (avatarFile) formData.append('avatar', avatarFile);
       if (bannerFile) formData.append('banner', bannerFile); 
 
-      const res = await api.put('/users/profile', formData); // Assure-toi que cette route existe (voir point 2)
+      const res = await api.put('/users/profile', formData);
       setUser(res.data);
       onClose();
     } catch (error) {
@@ -85,7 +85,6 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       >
         <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
             
-            {/* 👇 CORRECTION : On crée un wrapper 'flex-1 overflow-y-auto' QUI CONTIENT LA BANNIÈRE ET LE RESTE */}
             <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                 
                 {/* --- BANNIÈRE --- */}
@@ -112,35 +111,33 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     </button>
                 </div>
 
-                {/* --- CONTENU DU PROFIL (Avatar + Inputs) --- */}
-                {/* On retire l'overflow ici car c'est le parent qui scroll maintenant */}
-                <div className="px-5 pb-5 relative bg-[#313338]">
-                    
-                    {/* --- AVATAR --- */}
-                    <div className="flex justify-between items-end -mt-[66px] mb-6 relative z-10 pointer-events-none"> 
-                        {/* pointer-events-none sur le container pour éviter de bloquer le clic sur la bannière en dessous si besoin, 
-                            mais on remet pointer-events-auto sur l'avatar */}
-                        <div 
-                            className="relative group cursor-pointer pointer-events-auto"
-                            onClick={() => avatarInputRef.current?.click()}
-                        >
-                            <div className="w-[130px] h-[130px] rounded-full p-[6px] bg-[#313338]">
-                                <div className="w-full h-full rounded-full overflow-hidden bg-[#1E1F22] flex items-center justify-center relative border-[3px] border-[#313338]">
-                                    {avatarPreview ? (
-                                        <img src={avatarPreview} className="w-full h-full object-cover transition group-hover:opacity-50" alt="Avatar" />
-                                    ) : (
-                                        <span className="text-4xl font-bold text-slate-400 transition group-hover:opacity-50">{user.username[0].toUpperCase()}</span>
-                                    )}
-                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                                    </div>
+                {/* --- AVATAR POSITIONNÉ EN ABSOLU --- */}
+                {/* 👇 CORRECTION ICI : Position absolue pour le placer à cheval sur la bannière */}
+                <div className="absolute top-[140px] left-[20px] z-10"> 
+                    <div 
+                        className="relative group cursor-pointer"
+                        onClick={() => avatarInputRef.current?.click()}
+                    >
+                        <div className="w-[130px] h-[130px] rounded-full p-[6px] bg-[#313338]">
+                            <div className="w-full h-full rounded-full overflow-hidden bg-[#1E1F22] flex items-center justify-center relative border-[3px] border-[#313338]">
+                                {avatarPreview ? (
+                                    <img src={avatarPreview} className="w-full h-full object-cover transition group-hover:opacity-50" alt="Avatar" />
+                                ) : (
+                                    <span className="text-4xl font-bold text-slate-400 transition group-hover:opacity-50">{user.username[0].toUpperCase()}</span>
+                                )}
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                                 </div>
                             </div>
-                            <input type="file" ref={avatarInputRef} className="hidden" onChange={handleAvatarChange} accept="image/*" />
                         </div>
+                        <input type="file" ref={avatarInputRef} className="hidden" onChange={handleAvatarChange} accept="image/*" />
                     </div>
+                </div>
 
-                    {/* --- FORM FIELDS --- */}
+                {/* --- CONTENU DU PROFIL (Inputs) --- */}
+                {/* 👇 CORRECTION ICI : Ajout d'un padding-top (pt-[80px]) pour compenser l'espace de l'avatar */}
+                <div className="px-5 pb-5 pt-[80px] relative bg-[#313338]">
+                    
                     <div className="space-y-6 max-w-lg">
                         <div>
                             <label className="block text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">
