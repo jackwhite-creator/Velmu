@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useAuthStore } from '../../store/authStore';
 import { useServerStore, Server, Channel, Category } from '../../store/serverStore';
 import api from '../../lib/api';
@@ -9,7 +8,6 @@ import { Socket } from 'socket.io-client';
 import EditServerModal from '../EditServerModal';
 import ConfirmModal from '../ConfirmModal';
 import EditChannelModal from '../EditChannelModal';
-import CreateChannelModal from '../CreateChannelModal';
 import CreateCategoryModal from '../CreateCategoryModal';
 import EditCategoryModal from '../EditCategoryModal';
 

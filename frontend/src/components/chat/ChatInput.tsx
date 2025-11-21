@@ -19,7 +19,9 @@ export default function ChatInput({
   inputValue, setInputValue, onSendMessage, replyingTo, setReplyingTo, socket, activeChannel 
 }: Props) {
   const { user } = useAuthStore();
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 👇 CORRECTION ICI : On utilise ReturnType<typeof setTimeout> pour être compatible navigateur
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSentRef = useRef<number>(0);
   
   // --- GESTION FICHIER ---

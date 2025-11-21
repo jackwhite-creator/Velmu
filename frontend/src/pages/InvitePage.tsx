@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useServerStore } from '../store/serverStore';
@@ -6,7 +6,7 @@ import { useServerStore } from '../store/serverStore';
 export default function InvitePage() {
   const { code } = useParams();
   const navigate = useNavigate();
-  const { addServer, setActiveServer, setActiveChannel, setActiveConversation } = useServerStore();
+  const { addServer, setActiveServer, setActiveConversation } = useServerStore();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');

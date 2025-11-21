@@ -104,7 +104,7 @@ export default function ChannelList({
                     {...provided.droppableProps}
                     className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-4"
                 >
-                    {server.categories.map((cat, index) => {
+                    {server.categories?.map((cat, index) => {
                         const isCollapsed = collapsedCategories.has(cat.id); // Vérifie si plié
 
                         return (

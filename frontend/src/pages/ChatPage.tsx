@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useServerStore } from '../store/serverStore';
-import { useFriendStore } from '../store/friendStore';
 import { useSocketStore } from '../store/socketStore';
 import { useChat } from '../hooks/useChat';
 import api from '../lib/api';
@@ -27,9 +26,9 @@ export default function ChatPage() {
   const { socket } = useSocketStore();
   
   const { 
-    activeServer, activeChannel, activeConversation, servers, conversations,
+    activeServer, activeChannel, activeConversation, servers,
     setServers, setConversations, setActiveServer, setActiveChannel, setActiveConversation,
-    removeServer, addConversation
+    removeServer
   } = useServerStore();
 
   // UI States

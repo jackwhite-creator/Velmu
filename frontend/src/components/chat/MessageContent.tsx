@@ -76,7 +76,7 @@ export default function MessageContent({
                 // 👇 MODIFICATION ICI : cursor-pointer au lieu de cursor-zoom-in
                 className="max-w-full md:max-w-sm max-h-[350px] rounded-lg shadow-sm border border-slate-700/50 cursor-pointer hover:shadow-md transition"
                 onClick={() => onImageClick(msg.fileUrl)}
-                onError={(e) => console.error("Erreur chargement image", msg.fileUrl)}
+                onError={() => console.error("Erreur chargement image", msg.fileUrl)}
               />
             </div>
           )}

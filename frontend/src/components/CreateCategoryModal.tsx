@@ -11,7 +11,7 @@ interface Props {
 export default function CreateCategoryModal({ isOpen, onClose, serverId }: Props) {
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { setActiveServer, activeServer } = useServerStore();
+  const { setActiveServer} = useServerStore();
 
   if (!isOpen) return null;
 

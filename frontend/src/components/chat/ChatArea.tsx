@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Channel, useServerStore } from '../../store/serverStore';
 import { useAuthStore } from '../../store/authStore';
 import { Socket } from 'socket.io-client';
