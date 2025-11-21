@@ -1,38 +1,59 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
 import { prisma } from '../lib/prisma';
 
 // Mettre à jour son propre profil
 export const updateProfile = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.userId;
-    const { bio, avatarUrl, bannerUrl } = req.body; // On récupère bannerUrl
+    
+    // 1. Récupération des données textuelles
+    const { bio, username } = req.body; 
+    
+    // 2. Récupération des fichiers (Multer via Cloudinary)
+    // On caste req.files pour que TypeScript reconnaisse la structure
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const avatarFile = files?.['avatar']?.[0];
+    const bannerFile = files?.['banner']?.[0];
 
     if (!userId) return res.status(401).json({ error: 'Non autorisé' });
 
+    // 3. Construction dynamique de l'objet de mise à jour
+    const dataToUpdate: any = {};
+
+    // On ne met à jour que si la valeur est fournie
+    if (bio !== undefined) dataToUpdate.bio = bio;
+    
+    // Si un fichier avatar est présent, on prend son chemin (URL Cloudinary)
+    if (avatarFile) {
+      dataToUpdate.avatarUrl = avatarFile.path;
+    }
+
+    // Si un fichier bannière est présent
+    if (bannerFile) {
+      dataToUpdate.bannerUrl = bannerFile.path;
+    }
+
+    // 4. Mise à jour en base de données
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: {
-        bio,
-        avatarUrl,
-        bannerUrl // On sauvegarde
-      },
+      data: dataToUpdate,
       select: {
         id: true,
         email: true,
         username: true,
         discriminator: true,
         avatarUrl: true,
-        bannerUrl: true, // On renvoie la nouvelle bannière
-        bio: true
+        bannerUrl: true,
+        bio: true,
+        createdAt: true
       }
     });
 
     res.json(updatedUser);
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Erreur lors de la mise à jour' });
+    console.error("Erreur mise à jour profil:", error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du profil' });
   }
 };
 
@@ -48,7 +69,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
         username: true,
         discriminator: true,
         avatarUrl: true,
-        bannerUrl: true, // On renvoie la bannière
+        bannerUrl: true,
         bio: true,
         createdAt: true
       }
@@ -60,6 +81,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
 
     res.json(user);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 };
