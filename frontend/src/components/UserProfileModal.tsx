@@ -32,7 +32,6 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'mutual_friends' | 'mutual_servers'>('info');
 
   const isOnline = userId ? onlineUsers.has(userId) : false;
   const isMe = currentUser?.id === userId;
