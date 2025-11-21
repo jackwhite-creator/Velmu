@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom'; // <--- Pour la redirection
 import api from '../lib/api';
 import { useServerStore } from '../store/serverStore';
 import { useFriendStore } from '../store/friendStore';
@@ -6,7 +7,7 @@ import { useAuthStore } from '../store/authStore';
 import { formatDiscordDate } from '../lib/dateUtils';
 
 interface UserProfileModalProps {
-  userId: string | null; // On revient à l'ID pour que ça marche partout
+  userId: string | null;
   onClose: () => void;
 }
 
@@ -21,21 +22,21 @@ interface FullProfile {
 }
 
 export default function UserProfileModal({ userId, onClose }: UserProfileModalProps) {
+  const navigate = useNavigate();
   const modalRef = useRef<HTMLDivElement>(null);
   
-  const { onlineUsers } = useServerStore();
+  const { onlineUsers, addConversation, setActiveConversation, setActiveServer } = useServerStore();
   const { requests, addRequest, updateRequest } = useFriendStore();
   const { user: currentUser } = useAuthStore();
 
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'mutual_friends' | 'mutual_servers'>('info');
 
   const isOnline = userId ? onlineUsers.has(userId) : false;
   const isMe = currentUser?.id === userId;
 
-  // 1. Chargement des données du profil via l'ID
+  // Chargement des données
   useEffect(() => {
     if (userId) {
       setLoading(true);
@@ -46,7 +47,7 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     }
   }, [userId]);
 
-  // Gestion clic dehors
+  // Fermeture au clic en dehors
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
@@ -57,8 +58,7 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [userId, onClose]);
 
-
-  // --- LOGIQUE AMIS ---
+  // --- LOGIQUE D'ÉTAT D'AMI ---
   const getFriendStatus = () => {
     if (isMe) return 'ME';
     const request = requests.find(
@@ -70,6 +70,33 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     if (request.senderId === currentUser?.id) return 'SENT';
     return 'RECEIVED';
   };
+  
+  const friendStatus = getFriendStatus();
+
+  // --- ACTIONS ---
+
+  const handleStartDM = async () => {
+    if (!userId) return;
+    setActionLoading(true);
+    try {
+      // 1. Créer ou récupérer la conversation
+      const res = await api.post('/conversations', { targetUserId: userId });
+      const conversation = res.data;
+
+      // 2. Mettre à jour le store
+      addConversation(conversation);
+      setActiveServer(null); // On quitte le serveur visuellement
+      setActiveConversation(conversation);
+
+      // 3. Redirection et Fermeture
+      onClose();
+      navigate('/channels/@me'); 
+    } catch (error) {
+      console.error("Erreur ouverture DM", error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleSendRequest = async () => {
     if (!profile) return;
@@ -80,11 +107,8 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
         discriminator: profile.discriminator 
       });
       addRequest(res.data);
-    } catch (error) {
-      console.error("Erreur ajout ami", error);
-    } finally {
-      setActionLoading(false);
-    }
+    } catch (error) { console.error(error); } 
+    finally { setActionLoading(false); }
   };
 
   const handleAcceptRequest = async () => {
@@ -94,139 +118,135 @@ export default function UserProfileModal({ userId, onClose }: UserProfileModalPr
     try {
         updateRequest(request.id, 'ACCEPTED');
         await api.post('/friends/respond', { requestId: request.id, action: 'ACCEPT' });
-    } catch (error) {
-        console.error("Erreur acceptation", error);
-    } finally {
-        setActionLoading(false);
-    }
+    } catch (error) { console.error(error); } 
+    finally { setActionLoading(false); }
   };
 
-  // --- RENDU DU BOUTON (DESIGN) ---
-  const renderActionButton = () => {
-    const status = getFriendStatus();
+  // --- RENDU DES BOUTONS ---
+  const renderButtons = () => {
+    if (isMe) return null;
 
-    if (status === 'ME') return null; // Pas de bouton pour soi-même sur la vue publique
-
-    if (status === 'FRIEND') {
-        return (
-          <button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-[3px] font-medium text-sm transition flex items-center justify-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-            Envoyer un message
-          </button>
-        );
-    }
-    if (status === 'SENT') {
-        return (
-          <button disabled className="flex-1 bg-slate-600 text-slate-300 py-2 px-4 rounded-[3px] font-medium text-sm cursor-not-allowed">
-            Demande envoyée
-          </button>
-        );
-    }
-    if (status === 'RECEIVED') {
-        return (
-          <button onClick={handleAcceptRequest} disabled={actionLoading} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-[3px] font-medium text-sm transition flex items-center justify-center gap-2">
-            {actionLoading ? '...' : 'Accepter la demande'}
-          </button>
-        );
-    }
-    // NONE
     return (
-        <button onClick={handleSendRequest} disabled={actionLoading} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-[3px] font-medium text-sm transition flex items-center justify-center gap-2">
-            {actionLoading ? 'Envoi...' : 'Ajouter en ami'}
+      <div className="flex gap-3 mt-4 justify-end">
+        <button 
+            onClick={handleStartDM}
+            disabled={actionLoading}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium text-sm transition shadow-sm"
+        >
+            Envoyer un message
         </button>
+
+        {friendStatus === 'NONE' && (
+            <button onClick={handleSendRequest} disabled={actionLoading} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium text-sm transition shadow-sm">
+               {actionLoading ? '...' : 'Ajouter en ami'}
+            </button>
+        )}
+        {friendStatus === 'SENT' && (
+            <button disabled className="px-4 py-2 bg-slate-700 text-slate-400 rounded font-medium text-sm cursor-not-allowed border border-slate-600">
+               Demande envoyée
+            </button>
+        )}
+        {friendStatus === 'RECEIVED' && (
+            <button onClick={handleAcceptRequest} disabled={actionLoading} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium text-sm transition shadow-sm">
+               Accepter la demande
+            </button>
+        )}
+        {friendStatus === 'FRIEND' && (
+             <button disabled className="px-4 py-2 bg-slate-700 text-green-400 rounded font-medium text-sm border border-slate-600 cursor-default">
+                Amis
+             </button>
+        )}
+      </div>
     );
   };
 
   if (!userId) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
         ref={modalRef}
-        className="bg-[#313338] w-full max-w-md rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative"
+        className="bg-[#111214] w-[600px] rounded-lg shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
       >
         {loading ? (
-            <div className="h-64 flex items-center justify-center text-slate-400">Chargement du profil...</div>
+            <div className="h-64 flex items-center justify-center text-slate-500">Chargement...</div>
         ) : profile ? (
-          <>
-            {/* --- BANNIÈRE --- */}
-            <div className="h-32 bg-gradient-to-r from-indigo-500 to-purple-600 relative">
-               {profile.bannerUrl && (
-                 <img src={profile.bannerUrl} className="w-full h-full object-cover" alt="Bannière" />
-               )}
-               <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/30 hover:bg-black/50 text-white/80 hover:text-white rounded-full transition-all">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-               </button>
-            </div>
-
-            <div className="px-4 pb-4 relative">
-              {/* --- AVATAR FLOTTANT --- */}
-              <div className="relative -mt-[60px] mb-3 w-fit">
-                <div className="w-32 h-32 rounded-full p-1.5 bg-[#313338]">
-                   <div className="w-full h-full rounded-full overflow-hidden bg-[#1E1F22] flex items-center justify-center border-[3px] border-[#313338]">
-                        {profile.avatarUrl ? (
-                            <img src={profile.avatarUrl} alt={profile.username} className="w-full h-full object-cover" />
-                        ) : (
-                            <span className="text-4xl font-bold text-slate-400">{profile.username[0].toUpperCase()}</span>
-                        )}
-                   </div>
-                   <div className={`absolute bottom-3 right-3 w-6 h-6 border-4 border-[#313338] rounded-full ${isOnline ? 'bg-green-500' : 'bg-slate-500'}`} title={isOnline ? "En ligne" : "Hors ligne"}></div>
-                </div>
-              </div>
-
-              {/* --- IDENTITÉ --- */}
-              <div className="mb-4 p-2 bg-[#111214] rounded-lg border border-slate-800">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h2 className="text-xl font-bold text-white leading-tight">{profile.username}</h2>
-                        <span className="text-slate-400 text-sm">#{profile.discriminator}</span>
-                    </div>
-                    {isMe && <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded uppercase font-bold">C'est vous</span>}
-                </div>
-              </div>
-
-              {/* --- ACTIONS --- */}
-              {!isMe && (
-                <div className="flex gap-2 mb-6">
-                    {renderActionButton()}
-                    
-                    {/* Bouton More (3 points) */}
-                    <button className="bg-[#4E5058] hover:bg-[#6D6F78] text-white p-2 rounded-[3px] transition flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            <>
+                {/* BANNIÈRE */}
+                <div className="h-[210px] w-full relative" style={{ backgroundColor: profile.bannerUrl ? 'transparent' : '#1E1F22' }}>
+                    {profile.bannerUrl ? (
+                        <img src={profile.bannerUrl} className="w-full h-full object-cover" alt="Banner" />
+                    ) : (
+                        // Couleur par défaut si pas de bannière (Gris foncé Discord ou couleur unie)
+                        <div className="w-full h-full bg-[#5865F2]"></div>
+                    )}
+                    {/* Bouton fermer discret */}
+                    <button onClick={onClose} className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white rounded-full p-2 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
                 </div>
-              )}
 
-              {/* --- ONGLETS --- */}
-              <div className="bg-[#2B2D31] rounded-lg overflow-hidden">
-                  <div className="flex border-b border-slate-700">
-                      <button onClick={() => setActiveTab('info')} className={`flex-1 py-3 text-sm font-medium transition ${activeTab === 'info' ? 'bg-slate-700/50 text-white' : 'text-slate-400 hover:bg-slate-700/30 hover:text-slate-200'}`}>Info</button>
-                      <button onClick={() => setActiveTab('mutual_servers')} className={`flex-1 py-3 text-sm font-medium transition ${activeTab === 'mutual_servers' ? 'bg-slate-700/50 text-white' : 'text-slate-400 hover:bg-slate-700/30 hover:text-slate-200'}`}>Serveurs</button>
-                  </div>
-                  
-                  <div className="p-4 min-h-[120px]">
-                    {activeTab === 'info' && (
-                        <div className="space-y-3">
-                            <div>
-                                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1">À propos de moi</h3>
-                                <p className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">
-                                    {profile.bio || <span className="italic opacity-50">Aucune bio renseignée.</span>}
-                                </p>
+                {/* CORPS DU PROFIL */}
+                <div className="px-5 pb-5 relative bg-[#111214]">
+                    
+                    {/* AVATAR (Chevauchement) */}
+                    <div className="flex justify-between items-end -mt-[70px] mb-4">
+                        <div className="relative">
+                            <div className="w-[130px] h-[130px] rounded-full p-[6px] bg-[#111214]">
+                                <div className="w-full h-full rounded-full overflow-hidden bg-[#2B2D31] flex items-center justify-center relative">
+                                    {profile.avatarUrl ? (
+                                        <img src={profile.avatarUrl} className="w-full h-full object-cover" alt={profile.username} />
+                                    ) : (
+                                        <span className="text-4xl font-bold text-slate-400">{profile.username[0].toUpperCase()}</span>
+                                    )}
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1">Membre depuis</h3>
-                                <p className="text-slate-400 text-xs">{formatDiscordDate(profile.createdAt)}</p>
+                            {/* Statut */}
+                            <div className={`absolute bottom-4 right-4 w-7 h-7 rounded-full border-[5px] border-[#111214] ${isOnline ? 'bg-green-500' : 'bg-slate-500'}`} title={isOnline ? "En ligne" : "Hors ligne"}></div>
+                        </div>
+
+                        {/* BOUTONS D'ACTION */}
+                        {renderButtons()}
+                    </div>
+
+                    {/* INFO UTILISATEUR */}
+                    <div className="bg-[#1E1F22] rounded-lg p-4 border border-[#2B2D31]">
+                        
+                        {/* Nom + Tag */}
+                        <div className="mb-4 border-b border-slate-700 pb-4">
+                            <h1 className="text-2xl font-bold text-white flex items-center gap-1">
+                                {profile.username}
+                                <span className="text-slate-400 font-medium text-xl">#{profile.discriminator}</span>
+                            </h1>
+                        </div>
+
+                        {/* A PROPOS */}
+                        <div className="mb-4">
+                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">À propos de moi</h3>
+                            <div className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">
+                                {profile.bio || <span className="italic opacity-50">Cet utilisateur n'a pas encore de bio.</span>}
                             </div>
                         </div>
-                    )}
-                    {activeTab === 'mutual_servers' && (
-                        <div className="text-center text-xs text-slate-500 py-4">Aucun serveur en commun (WIP)</div>
-                    )}
-                  </div>
-              </div>
 
-            </div>
-          </>
+                        {/* DATE D'ARRIVÉE */}
+                        <div className="mb-2">
+                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1">Membre depuis</h3>
+                            <p className="text-slate-400 text-xs">{formatDiscordDate(profile.createdAt)}</p>
+                        </div>
+                        
+                        {/* NOTE (Optionnel) */}
+                        <div className="mt-4 pt-4 border-t border-slate-700">
+                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">Note</h3>
+                             <input 
+                                className="w-full bg-transparent text-xs text-slate-300 placeholder-slate-500 focus:outline-none"
+                                placeholder="Cliquez pour ajouter une note..."
+                             />
+                        </div>
+
+                    </div>
+                </div>
+            </>
         ) : null}
       </div>
     </div>

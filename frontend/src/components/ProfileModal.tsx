@@ -1,253 +1,120 @@
-import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; // <--- Pour la redirection
-import api from '../lib/api';
-import { useServerStore } from '../store/serverStore';
-import { useFriendStore } from '../store/friendStore';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { formatDiscordDate } from '../lib/dateUtils';
+import api from '../lib/api';
 
-interface UserProfileModalProps {
-  userId: string | null;
+interface ProfileModalProps {
+  isOpen: boolean;
   onClose: () => void;
 }
 
-interface FullProfile {
-  id: string;
-  username: string;
-  discriminator: string;
-  avatarUrl: string | null;
-  bannerUrl: string | null;
-  bio: string | null;
-  createdAt: string;
-}
-
-export default function UserProfileModal({ userId, onClose }: UserProfileModalProps) {
-  const navigate = useNavigate();
+export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
+  // 👇 CORRECTION : On retire 'token' qui ne sert pas
+  const { user, setUser } = useAuthStore();
+  
+  const [username, setUsername] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
-  
-  const { onlineUsers, addConversation, setActiveConversation, setActiveServer } = useServerStore();
-  const { requests, addRequest, updateRequest } = useFriendStore();
-  const { user: currentUser } = useAuthStore();
 
-  const [profile, setProfile] = useState<FullProfile | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-
-  const isOnline = userId ? onlineUsers.has(userId) : false;
-  const isMe = currentUser?.id === userId;
-
-  // Chargement des données
   useEffect(() => {
-    if (userId) {
-      setLoading(true);
-      api.get(`/users/${userId}`)
-        .then(res => setProfile(res.data))
-        .catch(console.error)
-        .finally(() => setLoading(false));
+    if (isOpen && user) {
+      setUsername(user.username);
+      setAvatarUrl(user.avatarUrl || null);
+      setSelectedFile(null);
     }
-  }, [userId]);
+  }, [isOpen, user]);
 
-  // Fermeture au clic en dehors
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-        onClose();
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      setAvatarUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('username', username);
+      if (selectedFile) {
+        formData.append('avatar', selectedFile);
       }
-    };
-    if (userId) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [userId, onClose]);
 
-  // --- LOGIQUE D'ÉTAT D'AMI ---
-  const getFriendStatus = () => {
-    if (isMe) return 'ME';
-    const request = requests.find(
-      r => (r.senderId === currentUser?.id && r.receiverId === userId) || 
-           (r.senderId === userId && r.receiverId === currentUser?.id)
-    );
-    if (!request) return 'NONE';
-    if (request.status === 'ACCEPTED') return 'FRIEND';
-    if (request.senderId === currentUser?.id) return 'SENT';
-    return 'RECEIVED';
-  };
-  
-  const friendStatus = getFriendStatus();
+      // 👇 CORRECTION : Plus besoin de headers manuels, l'intercepteur api.ts gère le token
+      // et Axios gère le Content-Type multipart automatiquement
+      const res = await api.put('/users/profile', formData);
 
-  // --- ACTIONS ---
-
-  const handleStartDM = async () => {
-    if (!userId) return;
-    setActionLoading(true);
-    try {
-      // 1. Créer ou récupérer la conversation
-      const res = await api.post('/conversations', { targetUserId: userId });
-      const conversation = res.data;
-
-      // 2. Mettre à jour le store
-      addConversation(conversation);
-      setActiveServer(null); // On quitte le serveur visuellement
-      setActiveConversation(conversation);
-
-      // 3. Redirection et Fermeture
+      setUser(res.data);
       onClose();
-      navigate('/channels/@me'); 
     } catch (error) {
-      console.error("Erreur ouverture DM", error);
+      console.error("Erreur mise à jour profil", error);
     } finally {
-      setActionLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleSendRequest = async () => {
-    if (!profile) return;
-    setActionLoading(true);
-    try {
-      const res = await api.post('/friends/request', { 
-        username: profile.username, 
-        discriminator: profile.discriminator 
-      });
-      addRequest(res.data);
-    } catch (error) { console.error(error); } 
-    finally { setActionLoading(false); }
-  };
-
-  const handleAcceptRequest = async () => {
-    const request = requests.find(r => r.senderId === userId && r.receiverId === currentUser?.id);
-    if (!request) return;
-    setActionLoading(true);
-    try {
-        updateRequest(request.id, 'ACCEPTED');
-        await api.post('/friends/respond', { requestId: request.id, action: 'ACCEPT' });
-    } catch (error) { console.error(error); } 
-    finally { setActionLoading(false); }
-  };
-
-  // --- RENDU DES BOUTONS ---
-  const renderButtons = () => {
-    if (isMe) return null;
-
-    return (
-      <div className="flex gap-3 mt-4 justify-end">
-        <button 
-            onClick={handleStartDM}
-            disabled={actionLoading}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium text-sm transition shadow-sm"
-        >
-            Envoyer un message
-        </button>
-
-        {friendStatus === 'NONE' && (
-            <button onClick={handleSendRequest} disabled={actionLoading} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium text-sm transition shadow-sm">
-               {actionLoading ? '...' : 'Ajouter en ami'}
-            </button>
-        )}
-        {friendStatus === 'SENT' && (
-            <button disabled className="px-4 py-2 bg-slate-700 text-slate-400 rounded font-medium text-sm cursor-not-allowed border border-slate-600">
-               Demande envoyée
-            </button>
-        )}
-        {friendStatus === 'RECEIVED' && (
-            <button onClick={handleAcceptRequest} disabled={actionLoading} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium text-sm transition shadow-sm">
-               Accepter la demande
-            </button>
-        )}
-        {friendStatus === 'FRIEND' && (
-             <button disabled className="px-4 py-2 bg-slate-700 text-green-400 rounded font-medium text-sm border border-slate-600 cursor-default">
-                Amis
-             </button>
-        )}
-      </div>
-    );
-  };
-
-  if (!userId) return null;
+  if (!isOpen || !user) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div 
-        ref={modalRef}
-        className="bg-[#111214] w-[600px] rounded-lg shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {loading ? (
-            <div className="h-64 flex items-center justify-center text-slate-500">Chargement...</div>
-        ) : profile ? (
-            <>
-                {/* BANNIÈRE */}
-                <div className="h-[210px] w-full relative" style={{ backgroundColor: profile.bannerUrl ? 'transparent' : '#1E1F22' }}>
-                    {profile.bannerUrl ? (
-                        <img src={profile.bannerUrl} className="w-full h-full object-cover" alt="Banner" />
-                    ) : (
-                        // Couleur par défaut si pas de bannière (Gris foncé Discord ou couleur unie)
-                        <div className="w-full h-full bg-[#5865F2]"></div>
-                    )}
-                    {/* Bouton fermer discret */}
-                    <button onClick={onClose} className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 text-white rounded-full p-2 transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    </button>
-                </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div ref={modalRef} className="bg-[#313338] w-full max-w-md rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative">
+        
+        {/* Bannière */}
+        <div className="h-32 bg-gradient-to-r from-indigo-500 to-pink-500 relative">
+            <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/30 hover:bg-black/50 text-white/80 hover:text-white rounded-full transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
 
-                {/* CORPS DU PROFIL */}
-                <div className="px-5 pb-5 relative bg-[#111214]">
-                    
-                    {/* AVATAR (Chevauchement) */}
-                    <div className="flex justify-between items-end -mt-[70px] mb-4">
-                        <div className="relative">
-                            <div className="w-[130px] h-[130px] rounded-full p-[6px] bg-[#111214]">
-                                <div className="w-full h-full rounded-full overflow-hidden bg-[#2B2D31] flex items-center justify-center relative">
-                                    {profile.avatarUrl ? (
-                                        <img src={profile.avatarUrl} className="w-full h-full object-cover" alt={profile.username} />
-                                    ) : (
-                                        <span className="text-4xl font-bold text-slate-400">{profile.username[0].toUpperCase()}</span>
-                                    )}
-                                </div>
-                            </div>
-                            {/* Statut */}
-                            <div className={`absolute bottom-4 right-4 w-7 h-7 rounded-full border-[5px] border-[#111214] ${isOnline ? 'bg-green-500' : 'bg-slate-500'}`} title={isOnline ? "En ligne" : "Hors ligne"}></div>
+        <form onSubmit={handleSubmit}>
+          <div className="px-4 pb-4 relative">
+            <div className="relative -mt-[60px] mb-4 w-fit">
+                <div onClick={() => fileInputRef.current?.click()} className="relative w-32 h-32 rounded-full p-1.5 bg-[#313338] group cursor-pointer">
+                    <div className="w-full h-full rounded-full overflow-hidden relative bg-[#1E1F22] flex items-center justify-center">
+                        {avatarUrl ? (
+                            <img src={avatarUrl} alt={username} className="w-full h-full object-cover" /> 
+                        ) : (
+                            <span className="text-4xl font-bold text-slate-400">{username[0]?.toUpperCase()}</span>
+                        )}
+                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 text-white font-medium text-xs uppercase tracking-wide">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-1"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            Changer
                         </div>
-
-                        {/* BOUTONS D'ACTION */}
-                        {renderButtons()}
                     </div>
-
-                    {/* INFO UTILISATEUR */}
-                    <div className="bg-[#1E1F22] rounded-lg p-4 border border-[#2B2D31]">
-                        
-                        {/* Nom + Tag */}
-                        <div className="mb-4 border-b border-slate-700 pb-4">
-                            <h1 className="text-2xl font-bold text-white flex items-center gap-1">
-                                {profile.username}
-                                <span className="text-slate-400 font-medium text-xl">#{profile.discriminator}</span>
-                            </h1>
-                        </div>
-
-                        {/* A PROPOS */}
-                        <div className="mb-4">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">À propos de moi</h3>
-                            <div className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">
-                                {profile.bio || <span className="italic opacity-50">Cet utilisateur n'a pas encore de bio.</span>}
-                            </div>
-                        </div>
-
-                        {/* DATE D'ARRIVÉE */}
-                        <div className="mb-2">
-                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1">Membre depuis</h3>
-                            <p className="text-slate-400 text-xs">{formatDiscordDate(profile.createdAt)}</p>
-                        </div>
-                        
-                        {/* NOTE (Optionnel) */}
-                        <div className="mt-4 pt-4 border-t border-slate-700">
-                             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">Note</h3>
-                             <input 
-                                className="w-full bg-transparent text-xs text-slate-300 placeholder-slate-500 focus:outline-none"
-                                placeholder="Cliquez pour ajouter une note..."
-                             />
-                        </div>
-
-                    </div>
+                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} accept="image/*" />
                 </div>
-            </>
-        ) : null}
+            </div>
+
+            <h2 className="text-2xl font-bold text-white mb-1">{user.username}</h2>
+            <p className="text-slate-400 text-sm mb-6">#{user.discriminator}</p>
+
+            <div className="space-y-5 bg-[#2B2D31] p-4 rounded-lg">
+               <div>
+                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wide mb-2">Nom d'utilisateur</label>
+                 <input 
+                    type="text" 
+                    value={username} 
+                    onChange={(e) => setUsername(e.target.value)} 
+                    className="w-full bg-[#1E1F22] text-slate-200 p-2.5 rounded-[3px] outline-none border-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium" 
+                    required 
+                    minLength={3} 
+                 />
+               </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 bg-[#2B2D31] p-4 -mx-4 -mb-4 rounded-b-xl">
+              <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-white hover:underline transition-all">Annuler</button>
+              <button type="submit" disabled={isLoading} className="px-5 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-[3px] transition-all disabled:opacity-50 flex items-center">
+                {isLoading ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );
