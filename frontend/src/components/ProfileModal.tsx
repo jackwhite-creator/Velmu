@@ -74,7 +74,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       if (user?.username) formData.append('username', user.username);
 
       if (avatarFile) formData.append('avatar', avatarFile);
-      if (bannerFile) formData.append('banner', bannerFile); // Assure-toi que le backend gère ce champ 'banner'
+      if (bannerFile) formData.append('banner', bannerFile); 
 
       const res = await api.put('/users/profile', formData);
 
@@ -128,7 +128,8 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             <div className="px-5 pb-5 relative bg-[#313338] flex-1 overflow-y-auto">
                 
                 {/* --- AVATAR MODIFIABLE --- */}
-                <div className="flex justify-between items-end -mt-[70px] mb-6">
+                {/* 👇 CORRECTION ICI : ajout de 'relative z-10' et ajustement de la marge négative */}
+                <div className="flex justify-between items-end -mt-[66px] mb-6 relative z-10">
                     <div 
                         className="relative group cursor-pointer"
                         onClick={() => avatarInputRef.current?.click()}
