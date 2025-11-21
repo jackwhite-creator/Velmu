@@ -39,14 +39,15 @@ export const initializeSocket = (io: Server) => {
     socket.on('join_conversation', (conversationId) => socket.join(`conversation_${conversationId}`));
     socket.on('join_server', (serverId) => socket.join(`server_${serverId}`));
 
-    // 5. MESSAGES
+    // 5. MESSAGES (Texte seul)
+    // Note: Les fichiers passent par l'API POST /chat
     socket.on('send_message', async (data) => {
       const { content, channelId, replyToId } = data;
       try {
         const message = await ChatService.createMessage(content, userId, channelId, undefined, replyToId);
         io.to(channelId).emit('receive_message', message);
       } catch (error) {
-        console.error(error);
+        console.error("Erreur socket send_message:", error);
       }
     });
 
@@ -57,11 +58,11 @@ export const initializeSocket = (io: Server) => {
         io.to(`conversation_${conversationId}`).emit('receive_direct_message', message);
         io.to(`conversation_${conversationId}`).emit('conversation_updated', conversationId);
       } catch (error) {
-        console.error(error);
+        console.error("Erreur socket send_direct_message:", error);
       }
     });
 
-    // 6. TYPING (Optionnel mais utile)
+    // 6. TYPING INDICATOR
     socket.on('typing_start', (data) => {
         const room = data.channelId || `conversation_${data.conversationId}`;
         socket.to(room).emit('user_typing', { ...data, userId, isTyping: true });

@@ -14,13 +14,18 @@ const httpServer = createServer(app);
 // 2. Configuration de Socket.IO
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST"]
+    // 👇 ICI LE FIX : On autorise Localhost ET Vercel
+    origin: [
+        "http://localhost:5173", 
+        "https://velmu-m3fe.vercel.app", 
+        /\.vercel\.app$/ // Regex pour autoriser toutes les previews Vercel
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
-// 3. IMPORTANT : On partage l'instance IO avec toute l'application Express
-// Cela permet d'utiliser req.app.get('io') dans les contrôleurs
+// 3. Partage de l'instance IO avec Express
 app.set('io', io);
 
 // 4. Initialisation des événements Socket
