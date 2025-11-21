@@ -120,7 +120,7 @@ export default function ServerList() {
             className="
               fixed left-[84px] z-[9999] 
               px-4 py-2 
-              bg-grey text-slate-900 
+              bg-white text-slate-900 
               text-base font-bold 
               rounded-lg shadow-2xl shadow-black/50
               pointer-events-none 
