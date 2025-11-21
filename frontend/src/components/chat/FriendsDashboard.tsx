@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useFriendStore, FriendRequest } from '../../store/friendStore';
 import { useServerStore } from '../../store/serverStore';
@@ -8,7 +8,7 @@ import ConfirmModal from '../ConfirmModal';
 
 export default function FriendsDashboard() {
   const { user } = useAuthStore();
-  const { requests, updateRequest, removeRequest, addRequest } = useFriendStore();
+  const { requests, setRequests, updateRequest, removeRequest, addRequest } = useFriendStore();
   const { onlineUsers, setActiveConversation, setActiveServer, addConversation } = useServerStore();
 
   const [activeTab, setActiveTab] = useState<'online' | 'all' | 'pending' | 'add'>('online');
@@ -19,7 +19,12 @@ export default function FriendsDashboard() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [friendToDelete, setFriendToDelete] = useState<{ id: string, name: string } | null>(null);
 
+  useEffect(() => {
+    api.get('/friends').then(res => setRequests(res.data)).catch(console.error);
+  }, []);
+
   const getFriend = (req: FriendRequest) => {
+    // Sécurité : si l'objet req est mal formé
     if (!req.sender || !req.receiver) return null;
     return req.senderId === user?.id ? req.receiver : req.sender;
   };
@@ -31,8 +36,8 @@ export default function FriendsDashboard() {
     setAddStatus(null);
     try {
       const res = await api.post('/friends/request', { usernameString: addUsername });
-      addRequest(res.data); 
-      setAddStatus({ type: 'success', msg: `Demande envoyÃ©e Ã  ${addUsername} !` });
+      addRequest(res.data); // Le backend renvoie maintenant sender ET receiver
+      setAddStatus({ type: 'success', msg: `Demande envoyée à ${addUsername} !` });
       setAddUsername('');
     } catch (err: any) {
       setAddStatus({ type: 'error', msg: err.response?.data?.error || "Erreur" });
@@ -41,22 +46,16 @@ export default function FriendsDashboard() {
 
   const handleAccept = async (requestId: string) => {
     try {
-      // Optimistic Update
+      await api.put('/friends/respond', { requestId, action: 'ACCEPT' });
       updateRequest(requestId, 'ACCEPTED');
-      await api.post('/friends/respond', { requestId, action: 'ACCEPT' });
     } catch (e) { console.error(e); }
   };
 
   const handleDecline = async (requestId: string) => {
-    // FIX : OPTIMISTIC UI (On retire tout de suite visuellement)
-    removeRequest(requestId);
-    
     try {
       await api.delete(`/friends/${requestId}`);
-    } catch (e) { 
-      console.error("Erreur suppression demande", e);
-      // IdÃ©alement on remettrait la demande si Ã§a Ã©choue, mais c'est rare
-    }
+      removeRequest(requestId);
+    } catch (e) { console.error(e); }
   };
 
   const confirmDeleteFriend = (requestId: string, friendName: string) => {
@@ -66,12 +65,9 @@ export default function FriendsDashboard() {
 
   const handleDeleteFriend = async () => {
     if (!friendToDelete) return;
-    // FIX : OPTIMISTIC UI ICI AUSSI
-    removeRequest(friendToDelete.id);
-    setConfirmOpen(false); // On ferme la modale tout de suite
-
     try {
       await api.delete(`/friends/${friendToDelete.id}`);
+      removeRequest(friendToDelete.id);
     } catch (e) { console.error(e); }
   };
 
@@ -121,11 +117,13 @@ export default function FriendsDashboard() {
 
       {/* CONTENU */}
       <div className="flex-1 flex">
+         
          <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+            
             {activeTab === 'add' ? (
                <div className="max-w-xl">
                   <h2 className="text-white font-bold text-xl mb-2">Ajouter un ami</h2>
-                  <p className="text-slate-400 text-sm mb-6">Tu peux ajouter des amis grÃ¢ce Ã  leur pseudo Velmu (ex: Pseudo#0000).</p>
+                  <p className="text-slate-400 text-sm mb-6">Tu peux ajouter des amis grâce à leur pseudo Velmu (ex: Pseudo#0000).</p>
                   
                   <form onSubmit={handleAddFriend} className="relative group">
                      <div className={`absolute inset-0 rounded-lg opacity-20 transition ${addStatus?.type === 'success' ? 'bg-green-500' : addStatus?.type === 'error' ? 'bg-red-500' : 'bg-indigo-500 group-focus-within:opacity-40'}`}></div>
@@ -144,9 +142,9 @@ export default function FriendsDashboard() {
             ) : (
                <div className="space-y-2">
                   <div className="text-xs font-bold text-slate-500 uppercase mb-4 pb-2 border-b border-slate-800 tracking-wider">
-                     {activeTab === 'online' ? `En ligne â€” ${displayedList().length}` : 
-                      activeTab === 'all' ? `Tous les amis â€” ${displayedList().length}` : 
-                      `En attente â€” ${displayedList().length}`}
+                     {activeTab === 'online' ? `En ligne — ${displayedList().length}` : 
+                      activeTab === 'all' ? `Tous les amis — ${displayedList().length}` : 
+                      `En attente — ${displayedList().length}`}
                   </div>
 
                   {displayedList().length === 0 ? (
@@ -154,20 +152,22 @@ export default function FriendsDashboard() {
                         <div className="w-32 h-32 bg-slate-800 rounded-full flex items-center justify-center mb-4">
                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
                         </div>
-                        <p className="text-slate-400 text-sm">Aucun ami Ã  afficher pour le moment.</p>
+                        <p className="text-slate-400 text-sm">Aucun ami à afficher pour le moment.</p>
                      </div>
                   ) : (
                      displayedList().map(req => {
                         const friend = getFriend(req);
+                        
+                        // Check défensif : Si friend est null (données incomplètes), on n'affiche rien
                         if (!friend) return null;
 
                         const isOnline = onlineUsers.has(friend.id);
                         const isIncoming = req.receiverId === user?.id && req.status === 'PENDING';
 
                         return (
-                           <div key={req.id} className="group flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 border border-transparent hover:border-slate-800 transition cursor-pointer" onClick={() => setViewProfileId(friend.id)}>
+                           <div key={req.id} className="group flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/50 border border-transparent hover:border-slate-800 transition cursor-pointer">
                               
-                              <div className="flex items-center gap-3 flex-1">
+                              <div className="flex items-center gap-3 flex-1" onClick={() => setViewProfileId(friend.id)}>
                                  <div className="relative">
                                     <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm overflow-hidden shadow-sm">
                                        {friend.avatarUrl ? <img src={friend.avatarUrl} className="w-full h-full object-cover" /> : friend.username[0].toUpperCase()}
@@ -183,7 +183,7 @@ export default function FriendsDashboard() {
                                     </div>
                                     <div className="text-xs text-slate-400 font-medium">
                                        {req.status === 'PENDING' 
-                                          ? (isIncoming ? "Demande reÃ§ue" : "Demande envoyÃ©e") 
+                                          ? (isIncoming ? "Demande reçue" : "Demande envoyée") 
                                           : (isOnline ? "En ligne" : "Hors ligne")}
                                     </div>
                                  </div>
@@ -223,7 +223,7 @@ export default function FriendsDashboard() {
             <h3 className="text-lg font-bold text-white mb-4">En ligne maintenant</h3>
             <div className="flex-1 flex flex-col items-center justify-center text-center opacity-50">
                <div className="w-full p-6 rounded-lg border-2 border-dashed border-slate-700 mb-4">
-                  <p className="text-sm text-slate-400">C'est trÃ¨s calme par ici...</p>
+                  <p className="text-sm text-slate-400">C'est très calme par ici...</p>
                </div>
             </div>
          </div>
@@ -237,7 +237,7 @@ export default function FriendsDashboard() {
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleDeleteFriend}
         title={`Retirer ${friendToDelete?.name}`}
-        message={`ÃŠtes-vous sÃ»r de vouloir retirer ${friendToDelete?.name} de vos amis ?`}
+        message={`Êtes-vous sûr de vouloir retirer ${friendToDelete?.name} de vos amis ?`}
         isDestructive={true}
         confirmText="Retirer"
       />
