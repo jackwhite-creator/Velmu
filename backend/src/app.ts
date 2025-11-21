@@ -14,10 +14,15 @@ import friendRoutes from './routes/friend.routes';
 
 const app = express();
 
+// 👇 CONFIGURATION CORS MISE À JOUR 👇
 app.use(cors({
-    origin: "http://localhost:5173",
+    origin: [
+        "http://localhost:5173",                // Développement local
+        "https://velmu-m3fe.vercel.app"         // Production (Ton site Vercel)
+    ],
     credentials: true
 }));
+
 app.use(express.json());
 
 // Utiliser process.cwd() pour un chemin absolu fiable vers les uploads
