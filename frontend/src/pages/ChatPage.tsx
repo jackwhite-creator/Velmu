@@ -6,7 +6,6 @@ import { useSocketStore } from '../store/socketStore';
 import { useChat } from '../hooks/useChat';
 import api from '../lib/api';
 
-// Components
 import ProfileModal from '../components/ProfileModal';
 import UserCard from '../components/UserCard';
 import UserProfileModal from '../components/UserProfileModal';
@@ -18,7 +17,7 @@ import CreateChannelModal from '../components/CreateChannelModal';
 import InviteModal from '../components/InviteModal';
 import DMSidebar from '../components/chat/DMSidebar';
 import FriendsDashboard from '../components/chat/FriendsDashboard';
-import ConfirmModal from '../components/ConfirmModal'; // <--- Import
+import ConfirmModal from '../components/ConfirmModal';
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -31,7 +30,6 @@ export default function ChatPage() {
     removeServer
   } = useServerStore();
 
-  // UI States
   const [inputValue, setInputValue] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [popover, setPopover] = useState<{ userId: string; x: number; y: number } | null>(null);
@@ -42,8 +40,6 @@ export default function ChatPage() {
   const [memberListVersion, setMemberListVersion] = useState(0);
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [isRestoring, setIsRestoring] = useState(true);
-
-  // --- NOUVEAU STATE POUR LA NOTIF DE KICK ---
   const [kickedServerName, setKickedServerName] = useState<string | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -53,7 +49,6 @@ export default function ChatPage() {
   const isDm = !activeServer && !!activeConversation;
   const { messages, loading: isLoadingChat, hasMore, sendMessage, loadMore } = useChat(targetId, isDm);
 
-  // 1. INIT
   useEffect(() => {
     if (!token) { navigate('/login'); return; }
     if (user?.id) api.get(`/users/${user.id}`).then(res => setUser({ ...res.data, email: user.email })).catch(() => {});
@@ -89,7 +84,6 @@ export default function ChatPage() {
     initData();
   }, [token, navigate]);
 
-  // 2. PERSISTANCE
   useEffect(() => {
     if (!isRestoring) {
         if (activeServer) {
@@ -103,7 +97,6 @@ export default function ChatPage() {
     }
   }, [activeServer?.id, activeChannel?.id, activeConversation?.id, isRestoring]);
 
-  // 3. ÉCOUTEURS SOCKET
   useEffect(() => {
     if (!socket) return;
     
@@ -132,9 +125,7 @@ export default function ChatPage() {
 
     const handleMemberKicked = ({ serverId, userId }: { serverId: string, userId: string }) => {
         if (user?.id === userId) {
-            // 1. On récupère le nom AVANT de supprimer pour l'afficher
             const serverName = servers.find(s => s.id === serverId)?.name || "un serveur";
-            
             removeServer(serverId);
             
             if (activeServer?.id === serverId) {
@@ -142,8 +133,6 @@ export default function ChatPage() {
                 setActiveChannel(null);
                 localStorage.removeItem('lastServerId');
                 navigate('/channels/@me');
-                
-                // 2. On affiche la belle modale au lieu de l'alert moche
                 setKickedServerName(serverName);
             }
         } else {
@@ -166,7 +155,6 @@ export default function ChatPage() {
     };
   }, [socket, servers, activeServer?.id, activeChannel?.id, user?.id, navigate, removeServer, setActiveServer, setActiveChannel]);
 
-  // Handlers UI
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
@@ -200,17 +188,17 @@ export default function ChatPage() {
       return null;
   }, [activeServer, activeChannel, activeConversation, user?.id]);
 
-  if (isRestoring) return <div className="flex h-screen w-full bg-slate-900 items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div></div>;
+  if (isRestoring) return <div className="flex h-screen w-full bg-[#313338] items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div></div>;
 
   return (
-    <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
+    <div className="flex h-screen bg-[#313338] text-slate-100 font-sans overflow-hidden">
       <ServerList />
       {activeServer ? (
         <ServerSidebar activeServer={activeServer} activeChannel={activeChannel} socket={socket} onChannelSelect={setActiveChannel} onCreateChannel={setCreationCategoryId} onInvite={() => setIsInviteOpen(true)} onOpenProfile={() => setIsProfileOpen(true)} />
       ) : (
         <DMSidebar onOpenProfile={() => setIsProfileOpen(true)} />
       )}
-      <div className="flex-1 flex min-h-0 bg-slate-900">
+      <div className="flex-1 flex min-h-0 bg-[#313338]">
          {!activeServer && !activeConversation ? <FriendsDashboard /> : (
              <ChatArea messages={messages} isLoadingMore={isLoadingChat} hasMore={hasMore} onScroll={loadMore} activeChannel={chatHeaderInfo} inputValue={inputValue} setInputValue={setInputValue} onSendMessage={handleSendMessage} showMembers={showMembers && !!activeServer} onUserClick={handleUserClick} onToggleMembers={() => setShowMembers(!showMembers)} scrollRef={scrollContainerRef} messagesEndRef={messagesEndRef} socket={socket} replyingTo={replyingTo} setReplyingTo={setReplyingTo} />
          )}
@@ -222,16 +210,15 @@ export default function ChatPage() {
       <CreateChannelModal isOpen={!!creationCategoryId} categoryId={creationCategoryId} onClose={() => setCreationCategoryId(null)} onSuccess={() => {}} />
       <InviteModal isOpen={isInviteOpen} server={activeServer} onClose={() => setIsInviteOpen(false)} />
       
-      {/* 👇 MODALE D'INFO QUAND ON EST KICKÉ 👇 */}
       <ConfirmModal 
         isOpen={!!kickedServerName}
         onClose={() => setKickedServerName(null)}
-        onConfirm={() => setKickedServerName(null)} // Juste fermer
+        onConfirm={() => setKickedServerName(null)} 
         title="Exclu du serveur"
         message={`Vous avez été exclu du serveur "${kickedServerName}".`}
         isDestructive={false}
         confirmText="Compris"
-        showCancel={false} // Pas de bouton Annuler
+        showCancel={false} 
       />
     </div>
   );

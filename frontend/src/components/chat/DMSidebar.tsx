@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useServerStore, Conversation } from '../../store/serverStore';
 import api from '../../lib/api';
-// 👇 IMPORT DU NOUVEAU FOOTER
 import UserFooter from './UserFooter';
 
 interface Props {
@@ -17,9 +16,7 @@ export default function DMSidebar({ onOpenProfile }: Props) {
   } = useServerStore();
 
   useEffect(() => {
-    api.get('/conversations/me')
-      .then(res => setConversations(res.data))
-      .catch(console.error);
+    api.get('/conversations/me').then(res => setConversations(res.data)).catch(console.error);
   }, []);
 
   const getOtherUser = (conversation: Conversation) => {
@@ -29,10 +26,7 @@ export default function DMSidebar({ onOpenProfile }: Props) {
   return (
     <div className="w-60 bg-[#2B2D31] border-r border-[#1E1F22] flex flex-col flex-shrink-0 z-20">
       
-      {/* Liste des DMs */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-0.5">
-        
-        {/* Bouton Amis */}
         <div 
           onClick={() => setActiveConversation(null)} 
           className={`flex items-center gap-3 px-2 py-2.5 rounded cursor-pointer mb-4 transition-colors
@@ -88,9 +82,7 @@ export default function DMSidebar({ onOpenProfile }: Props) {
         })}
       </div>
       
-      {/* 👇 UTILISATION DU NOUVEAU COMPOSANT FOOTER */}
       <UserFooter isConnected={true} onOpenProfile={onOpenProfile} />
-      
     </div>
   );
 }
