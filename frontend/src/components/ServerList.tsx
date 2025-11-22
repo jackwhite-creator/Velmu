@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useServerStore } from '../store/serverStore';
-import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import CreateServerModal from './CreateServerModal';
@@ -9,7 +8,6 @@ import JoinServerModal from './JoinServerModal';
 export default function ServerList() {
   const navigate = useNavigate();
   const { servers, setServers, activeServer, setActiveServer, setActiveChannel, setActiveConversation } = useServerStore();
-  const { user } = useAuthStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
 
