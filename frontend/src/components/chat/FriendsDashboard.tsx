@@ -46,13 +46,15 @@ export default function FriendsDashboard() {
 
   const handleAccept = async (requestId: string) => {
     try {
-      await api.put('/friends/respond', { requestId, action: 'ACCEPT' });
+      // 👇 CORRECTION ICI : api.put -> api.post
+      await api.post('/friends/respond', { requestId, action: 'ACCEPT' });
       updateRequest(requestId, 'ACCEPTED');
     } catch (e) { console.error(e); }
   };
 
   const handleDecline = async (requestId: string) => {
     try {
+      // On utilise DELETE ici, c'est correct car ta route backend gère le DELETE sur /:id
       await api.delete(`/friends/${requestId}`);
       removeRequest(requestId);
     } catch (e) { console.error(e); }
