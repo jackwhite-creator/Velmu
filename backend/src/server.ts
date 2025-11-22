@@ -17,7 +17,7 @@ const io = new Server(httpServer, {
     // 👇 ICI LE FIX : On autorise Localhost ET Vercel
     origin: [
         "http://localhost:5173", 
-        "https://velmu-m3fe.vercel.app", 
+        "https://velmu.vercel.app", 
         /\.vercel\.app$/ // Regex pour autoriser toutes les previews Vercel
     ],
     methods: ["GET", "POST"],

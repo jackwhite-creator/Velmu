@@ -18,7 +18,7 @@ const app = express();
 app.use(cors({
     origin: [
         "http://localhost:5173",                // Développement local
-        "https://velmu-m3fe.vercel.app"         // Production (Ton site Vercel)
+        "https://velmu.vercel.app"         // Production (Ton site Vercel)
     ],
     credentials: true
 }));
