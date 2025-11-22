@@ -15,6 +15,35 @@ interface Props {
   onImageClick: (url: string) => void;
 }
 
+// 👇 FONCTION UTILITAIRE POUR DÉTECTER LES LIENS
+const formatTextWithLinks = (text: string) => {
+  if (!text) return null;
+
+  // Regex pour capturer les URLs commençant par http:// ou https://
+  // On utilise des parenthèses () pour garder le séparateur dans le tableau après le split
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#00A8FC] hover:underline break-all cursor-pointer relative z-20" // Style Discord
+          onClick={(e) => e.stopPropagation()} // Empêche le clic de traverser vers le message
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 export default function MessageContent({ 
   msg, shouldGroup, isEditing, editContent, isMentioningMe, isModified,
   onUserClick, setEditContent, onSaveEdit, onCancelEdit, onImageClick
@@ -61,9 +90,9 @@ export default function MessageContent({
       ) : (
         <div>
           {msg.content && (
-            // 👇 CORRECTION ICI : 'break-all' au lieu de 'break-words' pour forcer le retour à la ligne
+            // 👇 UTILISATION DE LA FONCTION DE FORMATAGE ICI
             <p className={`text-slate-300 leading-relaxed whitespace-pre-wrap break-all ${shouldGroup ? '' : '-mt-1'} ${isMentioningMe ? 'text-slate-100' : ''}`}>
-              {msg.content}
+              {formatTextWithLinks(msg.content)}
               {isModified && <span className="text-[10px] text-slate-500 ml-1 select-none" title={`Modifié le ${new Date(msg.updatedAt).toLocaleString()}`}>(modifié)</span>}
             </p>
           )}
